@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tìm kiếm & Tra cứu</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a href="home.html">Trang chủ</a>
+        <a href="catalog.html">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html">Báo cáo</a>
+        <a href="users.html" id="navUsers">Người dùng</a>
+        <a href="search.html" class="active">Tra cứu</a>
+      </aside>
+      <main class="content">
+        <header class="page-header"><h1>Tìm kiếm & Tra cứu dữ liệu</h1></header>
+        <section class="panel">
+          <h3>Tìm kiếm tổng hợp</h3>
+          <div class="row">
+            <input id="q" placeholder="Từ khóa tìm kiếm..." style="flex: 1;" />
+            <select id="searchType" style="width: 150px;">
+              <option value="all">Tất cả</option>
+              <option value="products">Sản phẩm</option>
+              <option value="transactions">Phiếu kho</option>
+              <option value="customers">Khách hàng</option>
+              <option value="contracts">Hợp đồng</option>
+              <option value="invoices">Hóa đơn</option>
+            </select>
+            <button id="btnSearch" class="btn primary">Tìm kiếm</button>
+            <button id="btnExport" class="btn secondary">Xuất CSV</button>
+          </div>
+          
+          <div class="search-stats" style="margin: 10px 0; font-size: 14px; color: #666;">
+            <span id="resultCount">0 kết quả</span>
+          </div>
+          
+          <table class="table" id="tblResults">
+            <thead>
+              <tr>
+                <th>Loại</th>
+                <th>Mã/Code</th>
+                <th>Tên/Mô tả</th>
+                <th>Thông tin bổ sung</th>
+                <th>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+
+        <section class="panel">
+          <h3>Tìm kiếm nâng cao</h3>
+          <div class="advanced-search">
+            <div class="row">
+              <div class="col">
+                <label>Khách hàng:</label>
+                <select id="customerFilter">
+                  <option value="">Tất cả khách hàng</option>
+                </select>
+              </div>
+              <div class="col">
+                <label>Trạng thái:</label>
+                <select id="statusFilter">
+                  <option value="">Tất cả trạng thái</option>
+                  <option value="active">Hoạt động</option>
+                  <option value="inactive">Không hoạt động</option>
+                  <option value="pending">Chờ xử lý</option>
+                  <option value="completed">Hoàn thành</option>
+                  <option value="overdue">Quá hạn</option>
+                  <option value="paid">Đã thanh toán</option>
+                </select>
+              </div>
+              <div class="col">
+                <label>Từ ngày:</label>
+                <input type="date" id="dateFrom" />
+              </div>
+              <div class="col">
+                <label>Đến ngày:</label>
+                <input type="date" id="dateTo" />
+              </div>
+            </div>
+            <div class="row" style="margin-top: 10px;">
+              <button id="btnAdvancedSearch" class="btn primary">Tìm kiếm nâng cao</button>
+              <button id="btnClearFilters" class="btn secondary">Xóa bộ lọc</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      guardAuthenticated(); 
+      const current = getCurrentUser(); 
+      if(current.role !== 'Admin') document.getElementById('navUsers').style.display = 'none';
+
+      // Load dữ liệu mẫu
+      seedDemoData(false);
+
+      // Khởi tạo dropdown khách hàng
+      function initCustomerFilter() {
+        const customers = storage.get('customers', []);
+        const select = document.getElementById('customerFilter');
+        customers.forEach(customer => {
+          const option = document.createElement('option');
+          option.value = customer.code;
+          option.textContent = `${customer.code} - ${customer.name}`;
+          select.appendChild(option);
+        });
+      }
+
+      // Tìm kiếm tổng hợp
+      function search() {
+        const term = (q.value || '').toLowerCase();
+        const searchType = document.getElementById('searchType').value;
+        const rows = [];
+
+        if (searchType === 'all' || searchType === 'products') {
+          const products = storage.get('products', []).filter(p => 
+            p.code.toLowerCase().includes(term) || 
+            p.name.toLowerCase().includes(term)
+          );
+          products.forEach(p => rows.push([
+            'Sản phẩm', 
+            p.code, 
+            p.name, 
+            `Đơn vị: ${p.uom || 'N/A'}`, 
+            'Hoạt động'
+          ]));
+        }
+
+        if (searchType === 'all' || searchType === 'transactions') {
+          const txs = storage.get('transactions', []).filter(t => 
+            t.code.toLowerCase().includes(term)
+          );
+          txs.forEach(t => rows.push([
+            `Phiếu ${t.type === 'IN' ? 'Nhập' : 'Xuất'}`, 
+            t.code, 
+            `${t.lines.length} dòng`, 
+            `Ngày: ${t.date}`, 
+            'Hoàn thành'
+          ]));
+        }
+
+        if (searchType === 'all' || searchType === 'customers') {
+          const customers = storage.get('customers', []).filter(c => 
+            c.code.toLowerCase().includes(term) || 
+            c.name.toLowerCase().includes(term) ||
+            c.contactPerson.toLowerCase().includes(term)
+          );
+          customers.forEach(c => rows.push([
+            'Khách hàng', 
+            c.code, 
+            c.name, 
+            `Liên hệ: ${c.contactPerson} - ${c.phone}`, 
+            c.status === 'active' ? 'Hoạt động' : 'Không hoạt động'
+          ]));
+        }
+
+        if (searchType === 'all' || searchType === 'contracts') {
+          const contracts = storage.get('contracts', []).filter(c => 
+            c.code.toLowerCase().includes(term) || 
+            c.customerName.toLowerCase().includes(term) ||
+            c.description.toLowerCase().includes(term)
+          );
+          contracts.forEach(c => rows.push([
+            'Hợp đồng', 
+            c.code, 
+            c.description, 
+            `KH: ${c.customerName} - Giá trị: ${c.value.toLocaleString()}đ`, 
+            c.status === 'active' ? 'Hoạt động' : c.status === 'completed' ? 'Hoàn thành' : 'Chờ xử lý'
+          ]));
+        }
+
+        if (searchType === 'all' || searchType === 'invoices') {
+          const invoices = storage.get('invoices', []).filter(i => 
+            i.code.toLowerCase().includes(term) || 
+            i.customerName.toLowerCase().includes(term) ||
+            i.description.toLowerCase().includes(term)
+          );
+          invoices.forEach(i => rows.push([
+            'Hóa đơn', 
+            i.code, 
+            i.description, 
+            `KH: ${i.customerName} - Tổng: ${i.totalWithTax.toLocaleString()}đ`, 
+            i.status === 'paid' ? 'Đã thanh toán' : i.status === 'overdue' ? 'Quá hạn' : 'Chờ thanh toán'
+          ]));
+        }
+
+        renderResults(rows);
+      }
+
+      // Tìm kiếm nâng cao
+      function advancedSearch() {
+        const customerFilter = document.getElementById('customerFilter').value;
+        const statusFilter = document.getElementById('statusFilter').value;
+        const dateFrom = document.getElementById('dateFrom').value;
+        const dateTo = document.getElementById('dateTo').value;
+        const rows = [];
+
+        // Tìm kiếm hợp đồng
+        let contracts = storage.get('contracts', []);
+        if (customerFilter) {
+          contracts = contracts.filter(c => c.customerCode === customerFilter);
+        }
+        if (statusFilter) {
+          contracts = contracts.filter(c => c.status === statusFilter);
+        }
+        if (dateFrom) {
+          contracts = contracts.filter(c => c.startDate >= dateFrom);
+        }
+        if (dateTo) {
+          contracts = contracts.filter(c => c.endDate <= dateTo);
+        }
+        contracts.forEach(c => rows.push([
+          'Hợp đồng', 
+          c.code, 
+          c.description, 
+          `KH: ${c.customerName} - Giá trị: ${c.value.toLocaleString()}đ`, 
+          c.status === 'active' ? 'Hoạt động' : c.status === 'completed' ? 'Hoàn thành' : 'Chờ xử lý'
+        ]));
+
+        // Tìm kiếm hóa đơn
+        let invoices = storage.get('invoices', []);
+        if (customerFilter) {
+          invoices = invoices.filter(i => i.customerCode === customerFilter);
+        }
+        if (statusFilter) {
+          invoices = invoices.filter(i => i.status === statusFilter);
+        }
+        if (dateFrom) {
+          invoices = invoices.filter(i => i.issueDate >= dateFrom);
+        }
+        if (dateTo) {
+          invoices = invoices.filter(i => i.dueDate <= dateTo);
+        }
+        invoices.forEach(i => rows.push([
+          'Hóa đơn', 
+          i.code, 
+          i.description, 
+          `KH: ${i.customerName} - Tổng: ${i.totalWithTax.toLocaleString()}đ`, 
+          i.status === 'paid' ? 'Đã thanh toán' : i.status === 'overdue' ? 'Quá hạn' : 'Chờ thanh toán'
+        ]));
+
+        renderResults(rows);
+      }
+
+      // Hiển thị kết quả
+      function renderResults(rows) {
+        const tb = document.querySelector('#tblResults tbody');
+        document.getElementById('resultCount').textContent = `${rows.length} kết quả`;
+        
+        if (rows.length === 0) {
+          tb.innerHTML = '<tr><td colspan="5" class="muted">Không có kết quả</td></tr>';
+          return;
+        }
+
+        tb.innerHTML = rows.map(r => `
+          <tr>
+            <td><span class="badge badge-${getBadgeClass(r[0])}">${r[0]}</span></td>
+            <td><strong>${r[1]}</strong></td>
+            <td>${r[2]}</td>
+            <td>${r[3]}</td>
+            <td><span class="status-${r[4].toLowerCase().replace(/\s+/g, '-')}">${r[4]}</span></td>
+          </tr>
+        `).join('');
+      }
+
+      // Lấy class cho badge
+      function getBadgeClass(type) {
+        switch(type) {
+          case 'Sản phẩm': return 'primary';
+          case 'Phiếu Nhập': return 'success';
+          case 'Phiếu Xuất': return 'warning';
+          case 'Khách hàng': return 'info';
+          case 'Hợp đồng': return 'secondary';
+          case 'Hóa đơn': return 'danger';
+          default: return 'default';
+        }
+      }
+
+      // Xóa bộ lọc
+      function clearFilters() {
+        document.getElementById('customerFilter').value = '';
+        document.getElementById('statusFilter').value = '';
+        document.getElementById('dateFrom').value = '';
+        document.getElementById('dateTo').value = '';
+        document.getElementById('q').value = '';
+        document.getElementById('searchType').value = 'all';
+        renderResults([]);
+      }
+
+      // Xuất CSV
+      function exportCsv() {
+        const rows = [['Loại', 'Mã/Code', 'Tên/Mô tả', 'Thông tin bổ sung', 'Trạng thái']];
+        document.querySelectorAll('#tblResults tbody tr').forEach(tr => {
+          const cells = Array.from(tr.children);
+          if (cells.length > 1) { // Bỏ qua dòng "Không có kết quả"
+            rows.push([
+              cells[0].textContent.trim(),
+              cells[1].textContent.trim(),
+              cells[2].textContent.trim(),
+              cells[3].textContent.trim(),
+              cells[4].textContent.trim()
+            ]);
+          }
+        });
+        
+        const csv = rows.map(r => r.map(v => '"' + v.replaceAll('"', '""') + '"').join(',')).join('\n');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8;'}));
+        a.download = 'tracuu.csv';
+        a.click();
+      }
+
+      // Event listeners
+      btnSearch.onclick = search;
+      btnExport.onclick = exportCsv;
+      btnAdvancedSearch.onclick = advancedSearch;
+      btnClearFilters.onclick = clearFilters;
+
+      // Khởi tạo
+      initCustomerFilter();
+    </script>
+  </body>
+  </html>
+
+

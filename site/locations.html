@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý vị trí kho - Quản lý kho</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <style>
+        .location-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .location-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #10b981;
+        }
+        .location-card h3 {
+            margin-top: 0;
+            color: #065f46;
+        }
+        .warehouse-map {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .map-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .map-cell {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .map-cell:hover {
+            border-color: #3b82f6;
+            transform: scale(1.05);
+        }
+        .map-cell.occupied {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+        .map-cell.empty {
+            background: #d1fae5;
+            border-color: #10b981;
+        }
+        .map-cell.full {
+            background: #fee2e2;
+            border-color: #ef4444;
+        }
+        .location-info {
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
+        .product-count {
+            font-weight: bold;
+            color: #1f2937;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #374151;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .btn-success { background: #10b981; }
+        .btn-warning { background: #f59e0b; }
+        .btn-danger { background: #ef4444; }
+        .btn-info { background: #06b6d4; }
+        .location-table {
+            margin-top: 20px;
+        }
+        .location-table th {
+            background: #f3f4f6;
+            font-weight: 600;
+        }
+        .status-available { color: #10b981; font-weight: bold; }
+        .status-occupied { color: #f59e0b; font-weight: bold; }
+        .status-full { color: #ef4444; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <a href="home.html">Trang chủ</a>
+            <a href="catalog.html">Danh mục</a>
+            <a href="operations.html">Nghiệp vụ kho</a>
+            <a href="reports.html">Báo cáo</a>
+            <a href="users.html" id="navUsers">Người dùng</a>
+            <a href="search.html">Tra cứu</a>
+            <a href="customers.html">Khách hàng</a>
+            <a href="invoices.html">Hóa đơn</a>
+            <a href="locations.html" class="active">Vị trí kho</a>
+        </aside>
+        <main class="content">
+            <header class="page-header">
+                <h1>📍 Quản lý vị trí kho</h1>
+                <div class="grow"></div>
+                <button id="btnRefresh" class="btn secondary">🔄 Làm mới</button>
+            </header>
+
+            <!-- Thống kê vị trí -->
+            <section class="quick-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalLocations">0</div>
+                    <div class="stat-label">Tổng vị trí</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="availableLocations">0</div>
+                    <div class="stat-label">Vị trí trống</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="occupiedLocations">0</div>
+                    <div class="stat-label">Vị trí có hàng</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="fullLocations">0</div>
+                    <div class="stat-label">Vị trí đầy</div>
+                </div>
+            </section>
+
+            <!-- Tabs chính -->
+            <section class="tabs">
+                <button class="tab active" data-tab="manage">🏗️ Quản lý vị trí</button>
+                <button class="tab" data-tab="map">🗺️ Bản đồ kho</button>
+                <button class="tab" data-tab="assign">📦 Gán sản phẩm</button>
+                <button class="tab" data-tab="report">📊 Báo cáo</button>
+            </section>
+
+            <!-- Quản lý vị trí -->
+            <section id="manage" class="panel">
+                <h2>🏗️ Quản lý vị trí kho</h2>
+                <div class="transaction-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Kho</label>
+                            <select id="locationWh" required title="Chọn kho">
+                                <option value="">Chọn kho...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Mã vị trí</label>
+                            <input id="locationCode" placeholder="A-01-01" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Tên vị trí</label>
+                            <input id="locationName" placeholder="Kệ A, Tầng 1, Ô 1" required />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Loại vị trí</label>
+                            <select id="locationType" required title="Chọn loại vị trí">
+                                <option value="SHELF">Kệ</option>
+                                <option value="FLOOR">Sàn</option>
+                                <option value="PALLET">Pallet</option>
+                                <option value="COLD">Kho lạnh</option>
+                                <option value="HAZARDOUS">Kho nguy hiểm</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Diện tích (m²)</label>
+                            <input type="number" id="locationArea" placeholder="0" min="0" step="0.1" />
+                        </div>
+                        <div class="form-group">
+                            <label>Sức chứa tối đa</label>
+                            <input type="number" id="locationCapacity" placeholder="0" min="0" step="1" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Trạng thái</label>
+                            <select id="locationStatus" required title="Chọn trạng thái">
+                                <option value="AVAILABLE">Sẵn sàng</option>
+                                <option value="MAINTENANCE">Bảo trì</option>
+                                <option value="RESERVED">Đã đặt</option>
+                                <option value="DISABLED">Vô hiệu hóa</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Ghi chú</label>
+                            <textarea id="locationNote" rows="2" placeholder="Ghi chú về vị trí"></textarea>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button id="btnAddLocation" class="btn btn-success">➕ Thêm vị trí</button>
+                        <button id="btnUpdateLocation" class="btn btn-warning" style="display: none;">✏️ Cập nhật</button>
+                        <button id="btnClearLocation" class="btn secondary">🗑️ Xóa trắng</button>
+                    </div>
+                </div>
+                
+                <h3>Danh sách vị trí</h3>
+                <table class="table location-table" id="tblLocations">
+                    <thead>
+                        <tr>
+                            <th>Mã vị trí</th>
+                            <th>Tên vị trí</th>
+                            <th>Kho</th>
+                            <th>Loại</th>
+                            <th>Diện tích</th>
+                            <th>Sức chứa</th>
+                            <th>Trạng thái</th>
+                            <th>Sản phẩm</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+
+            <!-- Bản đồ kho -->
+            <section id="map" class="panel hidden">
+                <h2>🗺️ Bản đồ kho</h2>
+                <div class="transaction-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Chọn kho để xem bản đồ</label>
+                            <select id="mapWarehouse" required title="Chọn kho để xem bản đồ">
+                                <option value="">Chọn kho...</option>
+                            </select>
+                        </div>
+                                                 <div class="form-group">
+                             <label>Bộ lọc</label>
+                             <select id="mapFilter" title="Bộ lọc vị trí kho">
+                                 <option value="ALL">Tất cả</option>
+                                 <option value="AVAILABLE">Vị trí trống</option>
+                                 <option value="OCCUPIED">Có hàng</option>
+                                 <option value="FULL">Đầy</option>
+                             </select>
+                         </div>
+                    </div>
+                </div>
+                
+                <div class="warehouse-map">
+                    <h3>Bản đồ vị trí</h3>
+                    <div id="mapContainer">
+                        <p class="muted">Chọn kho để xem bản đồ vị trí</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Gán sản phẩm -->
+            <section id="assign" class="panel hidden">
+                <h2>📦 Gán sản phẩm vào vị trí</h2>
+                <div class="transaction-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Kho</label>
+                            <select id="assignWh" required title="Chọn kho">
+                                <option value="">Chọn kho...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Sản phẩm</label>
+                            <select id="assignProduct" required title="Chọn sản phẩm">
+                                <option value="">Chọn sản phẩm...</option>
+                            </select>
+                        </div>
+                                                 <div class="form-group">
+                             <label>Vị trí</label>
+                             <select id="assignLocation" required title="Chọn vị trí trong kho">
+                                 <option value="">Chọn vị trí...</option>
+                             </select>
+                         </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Số lượng</label>
+                            <input type="number" id="assignQty" placeholder="0" min="0" step="1" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Tồn kho hiện tại</label>
+                            <input type="text" id="assignCurrentStock" readonly />
+                        </div>
+                        <div class="form-group">
+                            <label>Ghi chú</label>
+                            <textarea id="assignNote" rows="2" placeholder="Ghi chú gán sản phẩm"></textarea>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button id="btnAssignProduct" class="btn btn-success">📦 Gán sản phẩm</button>
+                        <button id="btnUnassignProduct" class="btn btn-danger">❌ Bỏ gán</button>
+                        <button id="btnAssignClear" class="btn secondary">🗑️ Xóa trắng</button>
+                    </div>
+                </div>
+                
+                <h3>Danh sách sản phẩm theo vị trí</h3>
+                <table class="table location-table" id="tblAssignments">
+                    <thead>
+                        <tr>
+                            <th>Sản phẩm</th>
+                            <th>Vị trí</th>
+                            <th>Kho</th>
+                            <th class="right">Số lượng</th>
+                            <th>Ngày gán</th>
+                            <th>Ghi chú</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+
+            <!-- Báo cáo vị trí -->
+            <section id="report" class="panel hidden">
+                <h2>📊 Báo cáo vị trí kho</h2>
+                <div class="transaction-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="reportWh">Kho</label>
+                            <select id="reportWh" title="Chọn kho để báo cáo">
+                                <option value="">Tất cả kho</option>
+                            </select>
+                        </div>
+                             <label>Loại vị trí</label>
+                             <select id="reportType" title="Chọn loại vị trí để báo cáo">
+                                 <option value="">Tất cả loại</option>
+                                 <option value="SHELF">Kệ</option>
+                                 <option value="FLOOR">Sàn</option>
+                                 <option value="PALLET">Pallet</option>
+                                 <option value="COLD">Kho lạnh</option>
+                                 <option value="HAZARDOUS">Kho nguy hiểm</option>
+                             </select>
+                         </div>
+                        <div class="form-group">
+                            <label>Trạng thái</label>
+                            <select id="reportStatus">
+                                <option value="">Tất cả trạng thái</option>
+                                <option value="AVAILABLE">Sẵn sàng</option>
+                                <option value="OCCUPIED">Có hàng</option>
+                                <option value="FULL">Đầy</option>
+                                <option value="MAINTENANCE">Bảo trì</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button id="btnGenerateLocationReport" class="btn btn-info">📊 Tạo báo cáo</button>
+                        <button id="btnExportLocationReport" class="btn btn-success">📥 Xuất Excel</button>
+                        <button id="btnPrintLocationReport" class="btn btn-warning">🖨️ In báo cáo</button>
+                    </div>
+                </div>
+                
+                <div class="location-grid">
+                    <div class="location-card">
+                        <h3>📈 Thống kê sử dụng</h3>
+                        <div id="locationUsageStats"></div>
+                    </div>
+                    <div class="location-card">
+                        <h3>⚠️ Cảnh báo</h3>
+                        <div id="locationAlerts"></div>
+                    </div>
+                </div>
+                
+                <table class="table location-table" id="tblLocationReport">
+                    <thead>
+                        <tr>
+                            <th>Vị trí</th>
+                            <th>Kho</th>
+                            <th>Loại</th>
+                            <th>Diện tích</th>
+                            <th>Sức chứa</th>
+                            <th>Đã sử dụng</th>
+                            <th>Tỷ lệ sử dụng</th>
+                            <th>Trạng thái</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+        guardAuthenticated();
+        const current = getCurrentUser();
+        if (current.role !== 'Admin') document.getElementById('navUsers').style.display = 'none';
+
+        // Khởi tạo dữ liệu
+        const products = storage.get('products', []);
+        const warehouses = storage.get('warehouses', []);
+        const locations = storage.get('locations', []);
+        const transactions = storage.get('transactions', []);
+
+        // Cập nhật thống kê nhanh
+        function updateQuickStats() {
+            const totalLocations = locations.length;
+            const availableLocations = locations.filter(l => l.status === 'AVAILABLE').length;
+            const occupiedLocations = locations.filter(l => l.status === 'OCCUPIED').length;
+            const fullLocations = locations.filter(l => l.status === 'FULL').length;
+
+            document.getElementById('totalLocations').textContent = totalLocations.toLocaleString('vi-VN');
+            document.getElementById('availableLocations').textContent = availableLocations.toLocaleString('vi-VN');
+            document.getElementById('occupiedLocations').textContent = occupiedLocations.toLocaleString('vi-VN');
+            document.getElementById('fullLocations').textContent = fullLocations.toLocaleString('vi-VN');
+        }
+
+        // Khởi tạo form
+        function initializeForms() {
+            // Populate warehouse selects
+            const warehouseOptions = warehouses.map(w => 
+                `<option value="${w.id}">${w.code} - ${w.name}</option>`
+            ).join('');
+            
+            ['locationWh', 'mapWarehouse', 'assignWh', 'reportWh'].forEach(id => {
+                if (document.getElementById(id)) {
+                    document.getElementById(id).innerHTML = '<option value="">Chọn kho...</option>' + warehouseOptions;
+                }
+            });
+
+            // Populate product selects
+            const productOptions = products.map(p => 
+                `<option value="${p.id}">${p.code} - ${p.name}</option>`
+            ).join('');
+            
+            if (document.getElementById('assignProduct')) {
+                document.getElementById('assignProduct').innerHTML = '<option value="">Chọn sản phẩm...</option>' + productOptions;
+            }
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
+                
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.remove('hidden');
+            });
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeForms();
+            updateQuickStats();
+        });
+
+        // Refresh button
+        document.getElementById('btnRefresh').addEventListener('click', function() {
+            updateQuickStats();
+            alert('Đã làm mới dữ liệu!');
+        });
+    </script>
+</body>
+</html>

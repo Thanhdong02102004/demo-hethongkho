@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Warehouse Management System</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+        .warning { color: orange; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Debug - Warehouse Management System</h1>
+    
+    <div class="debug-section">
+        <h2>1. Storage Test</h2>
+        <div id="storageTest"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>2. Data Seeding Test</h2>
+        <div id="dataTest"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>3. Chart.js Test</h2>
+        <div id="chartTest"></div>
+        <canvas id="debugChart" width="400" height="200"></canvas>
+    </div>
+    
+    <div class="debug-section">
+        <h2>4. Console Logs</h2>
+        <div id="consoleLogs"></div>
+    </div>
+    
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    
+    <script>
+        const logs = [];
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        // Capture console logs
+        console.log = function(...args) {
+            logs.push({ type: 'log', args, time: new Date().toISOString() });
+            originalLog.apply(console, args);
+        };
+        
+        console.error = function(...args) {
+            logs.push({ type: 'error', args, time: new Date().toISOString() });
+            originalError.apply(console, args);
+        };
+        
+        function updateLogs() {
+            const logsDiv = document.getElementById('consoleLogs');
+            logsDiv.innerHTML = logs.map(log => 
+                `<div class="${log.type}">[${log.time}] ${log.type.toUpperCase()}: ${log.args.join(' ')}</div>`
+            ).join('');
+        }
+        
+        // Test 1: Storage
+        function testStorage() {
+            const storageDiv = document.getElementById('storageTest');
+            try {
+                storage.set('test', 'test-value');
+                const result = storage.get('test', 'not-found');
+                if (result === 'test-value') {
+                    storageDiv.innerHTML = '<div class="success">✓ Storage hoạt động bình thường</div>';
+                } else {
+                    storageDiv.innerHTML = '<div class="error">✗ Storage không hoạt động đúng</div>';
+                }
+                storage.remove('test');
+            } catch (error) {
+                storageDiv.innerHTML = `<div class="error">✗ Storage lỗi: ${error.message}</div>`;
+            }
+        }
+        
+        // Test 2: Data Seeding
+        function testDataSeeding() {
+            const dataDiv = document.getElementById('dataTest');
+            try {
+                // Clear existing data
+                storage.clearAll();
+                
+                // Seed data
+                seedDemoData(true);
+                
+                // Check data
+                const products = storage.get('products', []);
+                const transactions = storage.get('transactions', []);
+                const warehouses = storage.get('warehouses', []);
+                
+                if (products.length > 0 && transactions.length > 0 && warehouses.length > 0) {
+                    dataDiv.innerHTML = `
+                        <div class="success">✓ Data seeding thành công</div>
+                        <pre>Sản phẩm: ${products.length}
+Giao dịch: ${transactions.length}
+Kho: ${warehouses.length}</pre>
+                    `;
+                } else {
+                    dataDiv.innerHTML = `
+                        <div class="error">✗ Data seeding thất bại</div>
+                        <pre>Sản phẩm: ${products.length}
+Giao dịch: ${transactions.length}
+Kho: ${warehouses.length}</pre>
+                    `;
+                }
+            } catch (error) {
+                dataDiv.innerHTML = `<div class="error">✗ Data seeding lỗi: ${error.message}</div>`;
+            }
+        }
+        
+        // Test 3: Chart.js
+        function testChartJs() {
+            const chartDiv = document.getElementById('chartTest');
+            try {
+                if (typeof Chart === 'undefined') {
+                    chartDiv.innerHTML = '<div class="error">✗ Chart.js chưa được tải</div>';
+                    return;
+                }
+                
+                chartDiv.innerHTML = '<div class="success">✓ Chart.js đã được tải</div>';
+                
+                // Try to create a simple chart
+                const ctx = document.getElementById('debugChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Test 1', 'Test 2', 'Test 3'],
+                        datasets: [{
+                            label: 'Test Data',
+                            data: [10, 20, 30],
+                            backgroundColor: ['#ff6384', '#36a2eb', '#cc65fe']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Test Chart'
+                            }
+                        }
+                    }
+                });
+                
+                chartDiv.innerHTML += '<div class="success">✓ Chart tạo thành công</div>';
+            } catch (error) {
+                chartDiv.innerHTML = `<div class="error">✗ Chart.js lỗi: ${error.message}</div>`;
+            }
+        }
+        
+        // Run tests
+        setTimeout(() => {
+            testStorage();
+            testDataSeeding();
+            testChartJs();
+            updateLogs();
+        }, 1000);
+        
+        // Update logs every 2 seconds
+        setInterval(updateLogs, 2000);
+    </script>
+</body>
+</html>

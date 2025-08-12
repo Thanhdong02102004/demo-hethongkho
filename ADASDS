@@ -1,0 +1,1014 @@
+function getCurrentUser(){ return storage.get('currentUser', null); }
+
+function login(username, password){
+  const users = storage.get('users', []);
+  const user = users.find(u => u.username === username && u.password === password && u.active);
+  if (!user) return false;
+  storage.set('currentUser', { id: user.id, username: user.username, role: user.role, fullName: user.fullName });
+  return true;
+}
+
+function logout(){ storage.remove('currentUser'); window.location.href = 'index.html'; }
+
+function guardAuthenticated(requiredRole){
+  const user = getCurrentUser();
+  if (!user) { window.location.href = 'index.html'; return; }
+  if (requiredRole && user.role !== requiredRole) { alert('Bạn không có quyền truy cập trang này.'); window.location.href = 'home.html'; }
+}
+
+// Dữ liệu mẫu, seed lần đầu hoặc reset từ Trang chủ
+function seedDemoData(force = false) {
+  const seeded = storage.get('seeded', false);
+  if (seeded && !force) return;
+
+  const users = [
+    { id: crypto.randomUUID(), username: 'admin', password: '123456', fullName: 'Quản trị viên', role: 'Admin', active: true },
+    { id: crypto.randomUUID(), username: 'manager', password: '123456', fullName: 'Quản lý kho', role: 'Manager', active: true },
+    { id: crypto.randomUUID(), username: 'staff', password: '123456', fullName: 'Nhân viên kho', role: 'Staff', active: true }
+  ];
+  const warehouses = [
+    { id: crypto.randomUUID(), code: 'KHO1', name: 'Kho chính', location: 'KCN A', areaTotal: 1200, isCold: false },
+    { id: crypto.randomUUID(), code: 'KHO2', name: 'Kho lạnh', location: 'KCN B', areaTotal: 600, isCold: true }
+  ];
+  const products = [
+    { id: crypto.randomUUID(), code: 'SP001', name: 'Thùng carton', uom: 'Cái', barcode: '893000000001' },
+    { id: crypto.randomUUID(), code: 'SP002', name: 'Băng keo', uom: 'Cuộn', barcode: '893000000002' },
+    { id: crypto.randomUUID(), code: 'SP003', name: 'Pallet nhựa', uom: 'Cái', barcode: '893000000003' }
+  ];
+  const transactions = [];
+
+  storage.set('users', users);
+  storage.set('warehouses', warehouses);
+  storage.set('products', products);
+  storage.set('transactions', transactions);
+  storage.set('seeded', true);
+}
+
+// Seed nếu chưa có
+seedDemoData(false);
+
+// Lớp tiện ích thao tác localStorage với namespace
+const storage = {
+  ns: 'wms_demo_',
+  get(key, defaultValue) {
+    try {
+      const raw = localStorage.getItem(this.ns + key);
+      return raw ? JSON.parse(raw) : defaultValue;
+    } catch (e) {
+      console.error('Storage get error', e);
+      return defaultValue;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(this.ns + key, JSON.stringify(value));
+    } catch (e) {
+      console.error('Storage set error', e);
+    }
+  },
+  remove(key) { localStorage.removeItem(this.ns + key); },
+  clearAll() { Object.keys(localStorage).filter(k => k.startsWith(this.ns)).forEach(k => localStorage.removeItem(k)); }
+};
+
+:root{
+  --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e2e8f0; --primary:#22c55e; --danger:#ef4444;
+  --border:#263143; --accent:#1f2937;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+a{color:inherit;text-decoration:none}
+.btn{background:#334155;border:1px solid var(--border);color:var(--text);padding:.6rem .9rem;border-radius:.5rem;cursor:pointer}
+.btn.primary{background:var(--primary);border-color:#16a34a;color:#06250f}
+.btn.secondary{background:#0ea5e9;border-color:#0284c7;color:#04121b}
+.btn.danger{background:var(--danger);border-color:#dc2626;color:#270404}
+.btn.tiny{padding:.25rem .5rem;font-size:.85rem}
+.row{display:flex;gap:.6rem;align-items:center;margin:.6rem 0}
+.row.right{justify-content:flex-end}
+.grow{flex:1}
+.muted{color:var(--muted)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+
+/* Auth */
+.auth-page{display:grid;place-items:center}
+.auth-card{background:var(--card);border:1px solid var(--border);padding:2rem;border-radius:1rem;width:min(420px,92vw)}
+.auth-card h1{margin-top:0}
+label{display:block;margin:.25rem 0 .25rem .1rem;color:#cbd5e1;font-size:.9rem}
+input,select{width:100%;padding:.6rem .7rem;border-radius:.5rem;border:1px solid var(--border);background:var(--accent);color:var(--text)}
+input::placeholder{color:#94a3b8}
+.hint{margin-top:1rem;color:var(--muted)}
+
+/* App */
+.app-header{display:flex;gap:1rem;align-items:center;justify-content:space-between;background:var(--card);border-bottom:1px solid var(--border);padding:.6rem 1rem;position:sticky;top:0}
+.brand{font-weight:800}
+.top-nav a{margin:0 .4rem;padding:.4rem .6rem;border-radius:.4rem}
+.top-nav a.active,.top-nav a:hover{background:#1f2937}
+.user-box{display:flex;gap:.6rem;align-items:center}
+
+.container{max-width:1100px;margin:1rem auto;padding:0 1rem}
+.hero{margin:1rem 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem}
+.card{display:block;background:var(--card);border:1px solid var(--border);padding:1rem;border-radius:.8rem}
+.card:hover{border-color:#3b82f6}
+
+.panel{background:var(--card);border:1px solid var(--border);border-radius:.8rem;padding:1rem;margin:1rem 0}
+.page-header{display:flex;align-items:center;gap:.8rem;margin-top:.5rem}
+
+.layout{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.sidebar{background:#0b1220;border-right:1px solid var(--border);padding:1rem;display:flex;flex-direction:column;gap:.3rem}
+.sidebar a{padding:.5rem .7rem;border-radius:.5rem}
+.sidebar a.active,.sidebar a:hover{background:#1f2937}
+.content{padding:1rem}
+
+.tabs{display:flex;gap:.5rem;margin:.5rem 0}
+.tab{background:#223047;border:1px solid var(--border);color:var(--text);padding:.5rem .7rem;border-radius:.5rem;cursor:pointer}
+.tab.active{background:#1f2937}
+
+.table{width:100%;border-collapse:separate;border-spacing:0;margin:.6rem 0}
+.table th,.table td{padding:.6rem;border-bottom:1px solid var(--border)}
+.table thead th{position:sticky;top:0;background:#0b1220;border-bottom:1px solid var(--border);text-align:left}
+.table td.right,.table th.right{text-align:right}
+
+.modal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:grid;place-items:center}
+.modal.hidden{display:none}
+.modal-content{background:var(--card);border:1px solid var(--border);border-radius:.8rem;padding:1rem;min-width:min(540px,94vw)}
+
+.hidden{display:none}
+
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tìm kiếm & Tra cứu</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a href="home.html">Trang chủ</a>
+        <a href="catalog.html">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html">Báo cáo</a>
+        <a href="users.html" id="navUsers">Người dùng</a>
+        <a href="search.html" class="active">Tra cứu</a>
+      </aside>
+      <main class="content">
+        <header class="page-header">
+          <h1>Tìm kiếm & Tra cứu dữ liệu</h1>
+        </header>
+
+        <section class="panel">
+          <div class="row">
+            <input id="q" placeholder="Từ khóa sản phẩm/phiếu" />
+            <button id="btnSearch" class="btn primary">Tìm kiếm</button>
+            <button id="btnExport" class="btn secondary">Xuất CSV</button>
+          </div>
+          <table class="table" id="tblResults"><thead><tr><th>Loại</th><th>Mã/Code</th><th>Mô tả</th></tr></thead><tbody></tbody></table>
+        </section>
+      </main>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      guardAuthenticated();
+      const current = getCurrentUser();
+      if (current.role !== 'Admin') document.getElementById('navUsers').style.display = 'none';
+
+      function search() {
+        const term = (document.getElementById('q').value || '').toLowerCase();
+        const products = storage.get('products', []).filter(p => p.code.toLowerCase().includes(term) || p.name.toLowerCase().includes(term));
+        const txs = storage.get('transactions', []).filter(t => t.code.toLowerCase().includes(term));
+        const rows = [];
+        products.forEach(p => rows.push(['Sản phẩm', p.code, p.name]));
+        txs.forEach(t => rows.push(['Phiếu ' + (t.type === 'IN' ? 'Nhập' : 'Xuất'), t.code, `${t.lines.length} dòng`]))
+        const tbody = document.querySelector('#tblResults tbody');
+        tbody.innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Không có kết quả</td></tr>';
+      }
+
+      function exportCsv(){
+        const rows = [['Loại','Mã','Mô tả']];
+        document.querySelectorAll('#tblResults tbody tr').forEach(tr => rows.push(Array.from(tr.children).map(td => td.textContent)));
+        const csv = rows.map(r => r.map(v => '"'+v.replaceAll('"','""')+'"').join(',')).join('\n');
+        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = 'tracuu.csv'; a.click();
+      }
+
+      document.getElementById('btnSearch').onclick = search;
+      document.getElementById('btnExport').onclick = exportCsv;
+    </script>
+  </body>
+  </html>
+
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Người dùng hệ thống</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a href="home.html">Trang chủ</a>
+        <a href="catalog.html">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html">Báo cáo</a>
+        <a href="users.html" class="active">Người dùng</a>
+        <a href="search.html">Tra cứu</a>
+      </aside>
+      <main class="content">
+        <header class="page-header">
+          <h1>Quản lý người dùng hệ thống</h1>
+          <div class="grow"></div>
+          <button id="btnAddUser" class="btn primary">+ Tài khoản</button>
+        </header>
+
+        <section class="panel">
+          <table class="table" id="tblUsers">
+            <thead>
+              <tr>
+                <th>Tên đăng nhập</th>
+                <th>Họ tên</th>
+                <th>Vai trò</th>
+                <th>Trạng thái</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+
+    <div id="modal" class="modal hidden">
+      <div class="modal-content">
+        <h3 id="modalTitle"></h3>
+        <form id="modalForm"></form>
+        <div class="row right">
+          <button id="btnClose" class="btn">Đóng</button>
+          <button id="btnSave" class="btn primary">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      guardAuthenticated('Admin'); // chỉ admin
+
+      function render() {
+        const tbody = document.querySelector('#tblUsers tbody');
+        const users = storage.get('users', []);
+        tbody.innerHTML = users.map(u => `<tr>
+          <td>${u.username}</td>
+          <td>${u.fullName}</td>
+          <td>${u.role}</td>
+          <td>${u.active ? 'Hoạt động' : 'Khóa'}</td>
+          <td class="right">
+            <button class="btn tiny" onclick="editUser('${u.id}')">Sửa</button>
+            <button class="btn tiny danger" onclick="deleteUser('${u.id}')">Xóa</button>
+          </td>
+        </tr>`).join('');
+      }
+
+      function openModal(title, html, onSave) {
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalForm').innerHTML = html;
+        document.getElementById('modal').classList.remove('hidden');
+        document.getElementById('btnSave').onclick = () => {
+          const fd = new FormData(document.getElementById('modalForm'));
+          onSave(fd); close();
+        };
+        document.getElementById('btnClose').onclick = close;
+        function close(){ document.getElementById('modal').classList.add('hidden'); }
+      }
+
+      document.getElementById('btnAddUser').onclick = () => {
+        openModal('Thêm tài khoản', `
+          <label>Tên đăng nhập</label><input name="username" required />
+          <label>Mật khẩu</label><input name="password" type="password" required />
+          <label>Họ tên</label><input name="fullName" />
+          <label>Vai trò</label>
+          <select name="role">
+            <option value="Admin">Admin</option>
+            <option value="Manager">Manager</option>
+            <option value="Staff">Staff</option>
+          </select>
+          <label><input type="checkbox" name="active" checked /> Hoạt động</label>
+        `, fd => {
+          const users = storage.get('users', []);
+          users.push({ id: crypto.randomUUID(), username: fd.get('username'), password: fd.get('password'), fullName: fd.get('fullName') || fd.get('username'), role: fd.get('role'), active: fd.get('active') === 'on' });
+          storage.set('users', users);
+          render();
+        });
+      };
+
+      window.editUser = (id) => {
+        const users = storage.get('users', []);
+        const u = users.find(x => x.id === id);
+        openModal('Cập nhật tài khoản', `
+          <label>Tên đăng nhập</label><input name="username" value="${u.username}" required />
+          <label>Mật khẩu mới</label><input name="password" type="password" placeholder="(giữ nguyên nếu bỏ trống)" />
+          <label>Họ tên</label><input name="fullName" value="${u.fullName}" />
+          <label>Vai trò</label>
+          <select name="role">
+            <option value="Admin" ${u.role==='Admin'?'selected':''}>Admin</option>
+            <option value="Manager" ${u.role==='Manager'?'selected':''}>Manager</option>
+            <option value="Staff" ${u.role==='Staff'?'selected':''}>Staff</option>
+          </select>
+          <label><input type="checkbox" name="active" ${u.active?'checked':''} /> Hoạt động</label>
+        `, fd => {
+          u.username = fd.get('username');
+          if (fd.get('password')) u.password = fd.get('password');
+          u.fullName = fd.get('fullName');
+          u.role = fd.get('role');
+          u.active = fd.get('active') === 'on';
+          storage.set('users', users); render();
+        });
+      };
+
+      window.deleteUser = (id) => {
+        if (!confirm('Xóa tài khoản này?')) return;
+        const users = storage.get('users', []).filter(u => u.id !== id);
+        storage.set('users', users); render();
+      };
+
+      render();
+    </script>
+  </body>
+  </html>
+
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Báo cáo - Quản lý kho</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a href="home.html">Trang chủ</a>
+        <a href="catalog.html">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html" class="active">Báo cáo</a>
+        <a href="users.html" id="navUsers">Người dùng</a>
+        <a href="search.html">Tra cứu</a>
+      </aside>
+      <main class="content">
+        <header class="page-header">
+          <h1>Báo cáo - Thống kê</h1>
+          <div class="grow"></div>
+          <button id="btnExportReport" class="btn secondary">Xuất CSV</button>
+        </header>
+
+        <section class="panel">
+          <div class="row">
+            <select id="reportWh"></select>
+            <input type="date" id="fromDate" />
+            <input type="date" id="toDate" />
+            <button id="btnRun" class="btn primary">Chạy báo cáo</button>
+          </div>
+          <table class="table" id="tblRpt"><thead><tr><th>Sản phẩm</th><th class="right">Nhập</th><th class="right">Xuất</th><th class="right">Tồn</th></tr></thead><tbody></tbody></table>
+        </section>
+      </main>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      guardAuthenticated();
+      const current = getCurrentUser();
+      if (current.role !== 'Admin') document.getElementById('navUsers').style.display = 'none';
+
+      const products = storage.get('products', []);
+      const warehouses = storage.get('warehouses', []);
+      document.getElementById('reportWh').innerHTML = warehouses.map(w => `<option value="${w.id}">${w.code} - ${w.name}</option>`).join('');
+
+      document.getElementById('btnRun').onclick = () => runReport();
+      document.getElementById('btnExportReport').onclick = () => exportCsv();
+
+      function runReport() {
+        const wh = document.getElementById('reportWh').value;
+        const from = new Date(document.getElementById('fromDate').value || '1970-01-01');
+        const to = new Date(document.getElementById('toDate').value || '2999-12-31');
+        const txs = storage.get('transactions', [])
+          .filter(t => t.warehouseId === wh)
+          .filter(t => {
+            const d = new Date(t.createdAt);
+            return d >= from && d <= to;
+          });
+        const map = new Map();
+        products.forEach(p => map.set(p.id, { in: 0, out: 0 }));
+        txs.forEach(t => t.lines.forEach(l => {
+          const rec = map.get(l.productId) || { in: 0, out: 0 };
+          if (t.type === 'IN') rec.in += l.qty; else rec.out += l.qty;
+          map.set(l.productId, rec);
+        }));
+        const tbody = document.querySelector('#tblRpt tbody');
+        const rows = products.map(p => {
+          const rec = map.get(p.id) || { in: 0, out: 0 };
+          const onhand = rec.in - rec.out;
+          return `<tr><td>${p.code} - ${p.name}</td><td class="right">${rec.in}</td><td class="right">${rec.out}</td><td class="right">${onhand}</td></tr>`;
+        }).join('');
+        tbody.innerHTML = rows;
+      }
+
+      function exportCsv() {
+        const rows = [['Sản phẩm', 'Nhập', 'Xuất', 'Tồn']];
+        document.querySelectorAll('#tblRpt tbody tr').forEach(tr => {
+          const cols = Array.from(tr.children).map(td => td.textContent);
+          rows.push(cols);
+        });
+        const csv = rows.map(r => r.map(v => '"' + v.replaceAll('"', '""') + '"').join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = 'baocao.csv'; a.click();
+      }
+    </script>
+  </body>
+  </html>
+
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nghiệp vụ kho</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a href="home.html">Trang chủ</a>
+        <a href="catalog.html">Danh mục</a>
+        <a href="operations.html" class="active">Nghiệp vụ kho</a>
+        <a href="reports.html">Báo cáo</a>
+        <a href="users.html" id="navUsers">Người dùng</a>
+        <a href="search.html">Tra cứu</a>
+      </aside>
+      <main class="content">
+        <header class="page-header">
+          <h1>Nghiệp vụ kho</h1>
+        </header>
+
+        <section class="tabs">
+          <button class="tab active" data-tab="inbound">Nhập kho</button>
+          <button class="tab" data-tab="outbound">Xuất kho</button>
+          <button class="tab" data-tab="stocktake">Kiểm kê</button>
+        </section>
+
+        <section id="inbound" class="panel">
+          <h2>Phiếu nhập</h2>
+          <div class="row">
+            <select id="inWh"></select>
+            <input id="inCode" placeholder="Mã phiếu" />
+            <button id="btnAddIn" class="btn primary">Tạo phiếu nhập</button>
+          </div>
+          <div class="row">
+            <select id="inProduct"></select>
+            <input type="number" id="inQty" placeholder="Số lượng" />
+            <button id="btnInAddLine" class="btn">Thêm dòng</button>
+          </div>
+          <table class="table" id="tblInLines"><thead><tr><th>Sản phẩm</th><th class="right">SL</th></tr></thead><tbody></tbody></table>
+        </section>
+
+        <section id="outbound" class="panel hidden">
+          <h2>Phiếu xuất</h2>
+          <div class="row">
+            <select id="outWh"></select>
+            <input id="outCode" placeholder="Mã phiếu" />
+            <button id="btnAddOut" class="btn primary">Tạo phiếu xuất</button>
+          </div>
+          <div class="row">
+            <select id="outProduct"></select>
+            <input type="number" id="outQty" placeholder="Số lượng" />
+            <button id="btnOutAddLine" class="btn">Thêm dòng</button>
+          </div>
+          <table class="table" id="tblOutLines"><thead><tr><th>Sản phẩm</th><th class="right">SL</th></tr></thead><tbody></tbody></table>
+        </section>
+
+        <section id="stocktake" class="panel hidden">
+          <h2>Kiểm kê</h2>
+          <div class="row">
+            <select id="kkWh"></select>
+            <button id="btnRunKK" class="btn primary">Đối chiếu</button>
+          </div>
+          <table class="table" id="tblKK"><thead><tr><th>Sản phẩm</th><th class="right">Hệ thống</th><th class="right">Thực tế</th><th class="right">Chênh lệch</th></tr></thead><tbody></tbody></table>
+        </section>
+      </main>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      guardAuthenticated();
+      const current = getCurrentUser();
+      if (current.role !== 'Admin') document.getElementById('navUsers').style.display = 'none';
+
+      const products = storage.get('products', []);
+      const warehouses = storage.get('warehouses', []);
+
+      function optionsHtml(items, getValue, getText) {
+        return items.map(it => `<option value="${getValue(it)}">${getText(it)}</option>`).join('');
+      }
+      // Bind selects
+      document.getElementById('inWh').innerHTML = optionsHtml(warehouses, w => w.id, w => `${w.code} - ${w.name}`);
+      document.getElementById('outWh').innerHTML = optionsHtml(warehouses, w => w.id, w => `${w.code} - ${w.name}`);
+      document.getElementById('kkWh').innerHTML = optionsHtml(warehouses, w => w.id, w => `${w.code} - ${w.name}`);
+      document.getElementById('inProduct').innerHTML = optionsHtml(products, p => p.id, p => `${p.code} - ${p.name}`);
+      document.getElementById('outProduct').innerHTML = optionsHtml(products, p => p.id, p => `${p.code} - ${p.name}`);
+
+      // Inbound
+      const inLines = [];
+      document.getElementById('btnInAddLine').onclick = () => {
+        const pid = document.getElementById('inProduct').value;
+        const qty = Number(document.getElementById('inQty').value || 0);
+        if (!pid || qty <= 0) return alert('Chọn sản phẩm và số lượng > 0');
+        inLines.push({ productId: pid, qty });
+        renderLines('tblInLines', inLines);
+      };
+      document.getElementById('btnAddIn').onclick = () => {
+        if (inLines.length === 0) return alert('Chưa có dòng hàng.');
+        const whId = document.getElementById('inWh').value;
+        const code = document.getElementById('inCode').value || `PN-${Date.now()}`;
+        saveTransaction('IN', code, whId, inLines);
+        inLines.length = 0; renderLines('tblInLines', inLines);
+        alert('Đã nhập kho.');
+      };
+
+      // Outbound
+      const outLines = [];
+      document.getElementById('btnOutAddLine').onclick = () => {
+        const pid = document.getElementById('outProduct').value;
+        const qty = Number(document.getElementById('outQty').value || 0);
+        if (!pid || qty <= 0) return alert('Chọn sản phẩm và số lượng > 0');
+        outLines.push({ productId: pid, qty });
+        renderLines('tblOutLines', outLines);
+      };
+      document.getElementById('btnAddOut').onclick = () => {
+        if (outLines.length === 0) return alert('Chưa có dòng hàng.');
+        const whId = document.getElementById('outWh').value;
+        const code = document.getElementById('outCode').value || `PX-${Date.now()}`;
+        // Kiểm tra tồn trước khi xuất
+        const insuff = outLines.find(l => getOnHand(whId, l.productId) < l.qty);
+        if (insuff) return alert('Tồn kho không đủ để xuất.');
+        saveTransaction('OUT', code, whId, outLines);
+        outLines.length = 0; renderLines('tblOutLines', outLines);
+        alert('Đã xuất kho.');
+      };
+
+      // Stocktake
+      document.getElementById('btnRunKK').onclick = () => {
+        const whId = document.getElementById('kkWh').value;
+        const tbody = document.querySelector('#tblKK tbody');
+        const rows = products.map(p => {
+          const sys = getOnHand(whId, p.id);
+          const real = sys; // demo: giả định bằng hệ thống
+          const diff = real - sys;
+          return `<tr><td>${p.code} - ${p.name}</td><td class="right">${sys}</td><td class="right">${real}</td><td class="right">${diff}</td></tr>`;
+        }).join('');
+        tbody.innerHTML = rows;
+      };
+
+      // Helpers
+      function renderLines(tableId, lines) {
+        const tbody = document.querySelector(`#${tableId} tbody`);
+        const rows = lines.map(l => {
+          const p = products.find(x => x.id === l.productId);
+          return `<tr><td>${p.code} - ${p.name}</td><td class="right">${l.qty}</td></tr>`;
+        }).join('');
+        tbody.innerHTML = rows || '<tr><td colspan="2" class="muted">Chưa có dòng</td></tr>';
+      }
+
+      function saveTransaction(type, code, warehouseId, lines) {
+        const txs = storage.get('transactions', []);
+        txs.push({ id: crypto.randomUUID(), type, code, warehouseId, lines: JSON.parse(JSON.stringify(lines)), createdAt: new Date().toISOString() });
+        storage.set('transactions', txs);
+      }
+
+      function getOnHand(warehouseId, productId) {
+        const txs = storage.get('transactions', []);
+        let qty = 0;
+        txs.filter(t => t.warehouseId === warehouseId).forEach(t => {
+          t.lines.forEach(l => { if (l.productId === productId) qty += (t.type === 'IN' ? l.qty : -l.qty); });
+        });
+        return qty;
+      }
+
+      // Tabs
+      document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(x => x.classList.add('hidden'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.remove('hidden');
+      }));
+    </script>
+  </body>
+  </html>
+
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Danh mục - Quản lý kho</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a href="home.html">Trang chủ</a>
+        <a href="catalog.html" class="active">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html">Báo cáo</a>
+        <a href="users.html" id="navUsers">Người dùng</a>
+        <a href="search.html">Tra cứu</a>
+      </aside>
+      <main class="content">
+        <header class="page-header">
+          <h1>Quản lý danh mục</h1>
+          <div class="grow"></div>
+          <button id="btnAddProduct" class="btn primary">+ Sản phẩm</button>
+          <button id="btnAddWarehouse" class="btn">+ Kho</button>
+          <button id="btnExport" class="btn secondary">Xuất Excel (CSV)</button>
+        </header>
+
+        <section class="panel">
+          <h2>Sản phẩm</h2>
+          <div class="row">
+            <input id="filterProducts" placeholder="Lọc theo tên hoặc mã..." />
+          </div>
+          <table class="table" id="tblProducts">
+            <thead>
+              <tr>
+                <th>Mã</th>
+                <th>Tên</th>
+                <th>ĐVT</th>
+                <th>Mã vạch</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+
+        <section class="panel">
+          <h2>Kho & Vị trí</h2>
+          <table class="table" id="tblWarehouses">
+            <thead>
+              <tr>
+                <th>Mã kho</th>
+                <th>Tên kho</th>
+                <th>Địa điểm</th>
+                <th>Diện tích (m²)</th>
+                <th>Lạnh</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+
+    <div id="modal" class="modal hidden">
+      <div class="modal-content">
+        <h3 id="modalTitle">Thêm</h3>
+        <form id="modalForm"></form>
+        <div class="row right">
+          <button class="btn" id="btnClose">Đóng</button>
+          <button class="btn primary" id="btnSave">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      guardAuthenticated();
+      const current = getCurrentUser();
+      if (current.role !== 'Admin') document.getElementById('navUsers').style.display = 'none';
+
+      const $ = (sel) => document.querySelector(sel);
+      const $$ = (sel) => document.querySelectorAll(sel);
+
+      function renderProducts() {
+        const tbody = $('#tblProducts tbody');
+        const term = ($('#filterProducts').value || '').toLowerCase();
+        const rows = storage.get('products', [])
+          .filter(p => !term || p.code.toLowerCase().includes(term) || p.name.toLowerCase().includes(term))
+          .map(p => `<tr>
+              <td>${p.code}</td>
+              <td>${p.name}</td>
+              <td>${p.uom || ''}</td>
+              <td>${p.barcode || ''}</td>
+              <td class="right">
+                <button class="btn tiny" onclick="editProduct('${p.id}')">Sửa</button>
+                <button class="btn tiny danger" onclick="deleteProduct('${p.id}')">Xóa</button>
+              </td>
+            </tr>`).join('');
+        tbody.innerHTML = rows || '<tr><td colspan="5" class="muted">Không có dữ liệu</td></tr>';
+      }
+
+      function renderWarehouses() {
+        const tbody = $('#tblWarehouses tbody');
+        const rows = storage.get('warehouses', [])
+          .map(k => `<tr>
+              <td>${k.code}</td>
+              <td>${k.name}</td>
+              <td>${k.location}</td>
+              <td class="right">${k.areaTotal?.toLocaleString('vi-VN')}</td>
+              <td>${k.isCold ? 'Có' : 'Không'}</td>
+              <td class="right">
+                <button class="btn tiny" onclick="editWarehouse('${k.id}')">Sửa</button>
+                <button class="btn tiny danger" onclick="deleteWarehouse('${k.id}')">Xóa</button>
+              </td>
+            </tr>`).join('');
+        tbody.innerHTML = rows || '<tr><td colspan="6" class="muted">Không có dữ liệu</td></tr>';
+      }
+
+      function openModal(title, formHtml, onSave) {
+        $('#modalTitle').textContent = title;
+        $('#modalForm').innerHTML = formHtml;
+        $('#modal').classList.remove('hidden');
+        const save = () => { onSave(new FormData($('#modalForm'))); closeModal(); };
+        $('#btnSave').onclick = save;
+      }
+      function closeModal() { $('#modal').classList.add('hidden'); }
+      $('#btnClose').onclick = closeModal;
+
+      // CRUD sản phẩm
+      function editProduct(id) {
+        const list = storage.get('products', []);
+        const item = list.find(x => x.id === id);
+        openModal('Cập nhật sản phẩm', `
+          <label>Mã</label><input name="code" value="${item.code}" required/>
+          <label>Tên</label><input name="name" value="${item.name}" required/>
+          <label>ĐVT</label><input name="uom" value="${item.uom || ''}" />
+          <label>Mã vạch</label><input name="barcode" value="${item.barcode || ''}" />
+        `, (fd) => {
+          item.code = fd.get('code');
+          item.name = fd.get('name');
+          item.uom = fd.get('uom');
+          item.barcode = fd.get('barcode');
+          storage.set('products', list);
+          renderProducts();
+        });
+      }
+      function deleteProduct(id) {
+        if (!confirm('Xóa sản phẩm này?')) return;
+        const list = storage.get('products', []).filter(x => x.id !== id);
+        storage.set('products', list);
+        renderProducts();
+      }
+      document.getElementById('btnAddProduct').onclick = () => {
+        openModal('Thêm sản phẩm', `
+          <label>Mã</label><input name="code" required/>
+          <label>Tên</label><input name="name" required/>
+          <label>ĐVT</label><input name="uom" />
+          <label>Mã vạch</label><input name="barcode" />
+        `, (fd) => {
+          const list = storage.get('products', []);
+          list.push({ id: crypto.randomUUID(), code: fd.get('code'), name: fd.get('name'), uom: fd.get('uom'), barcode: fd.get('barcode') });
+          storage.set('products', list);
+          renderProducts();
+        });
+      };
+
+      // CRUD kho
+      function editWarehouse(id) {
+        const list = storage.get('warehouses', []);
+        const k = list.find(x => x.id === id);
+        openModal('Cập nhật kho', `
+          <label>Mã kho</label><input name="code" value="${k.code}" required/>
+          <label>Tên kho</label><input name="name" value="${k.name}" required/>
+          <label>Địa điểm</label><input name="location" value="${k.location}" required/>
+          <label>Diện tích (m²)</label><input type="number" step="0.01" name="areaTotal" value="${k.areaTotal}" />
+          <label><input type="checkbox" name="isCold" ${k.isCold ? 'checked' : ''}/> Kho lạnh</label>
+        `, (fd) => {
+          k.code = fd.get('code');
+          k.name = fd.get('name');
+          k.location = fd.get('location');
+          k.areaTotal = Number(fd.get('areaTotal') || 0);
+          k.isCold = fd.get('isCold') === 'on';
+          storage.set('warehouses', list);
+          renderWarehouses();
+        });
+      }
+      function deleteWarehouse(id) {
+        if (!confirm('Xóa kho này?')) return;
+        const list = storage.get('warehouses', []).filter(x => x.id !== id);
+        storage.set('warehouses', list);
+        renderWarehouses();
+      }
+      document.getElementById('btnAddWarehouse').onclick = () => {
+        openModal('Thêm kho', `
+          <label>Mã kho</label><input name="code" required/>
+          <label>Tên kho</label><input name="name" required/>
+          <label>Địa điểm</label><input name="location" required/>
+          <label>Diện tích (m²)</label><input type="number" step="0.01" name="areaTotal" />
+          <label><input type="checkbox" name="isCold"/> Kho lạnh</label>
+        `, (fd) => {
+          const list = storage.get('warehouses', []);
+          list.push({
+            id: crypto.randomUUID(),
+            code: fd.get('code'),
+            name: fd.get('name'),
+            location: fd.get('location'),
+            areaTotal: Number(fd.get('areaTotal') || 0),
+            isCold: fd.get('isCold') === 'on'
+          });
+          storage.set('warehouses', list);
+          renderWarehouses();
+        });
+      };
+
+      // Export CSV đơn giản
+      document.getElementById('btnExport').onclick = () => {
+        const rows = storage.get('products', []);
+        const csv = ['code,name,uom,barcode']
+          .concat(rows.map(r => [r.code, r.name, r.uom || '', r.barcode || ''].map(v => '"' + String(v).replaceAll('"', '""') + '"').join(',')))
+          .join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'products.csv'; a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      $('#filterProducts').addEventListener('input', renderProducts);
+
+      renderProducts();
+      renderWarehouses();
+    </script>
+  </body>
+  </html>
+
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trang chủ - Quản lý kho</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">QL Kho</div>
+      <nav class="top-nav">
+        <a href="home.html" class="active">Trang chủ</a>
+        <a href="catalog.html">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html">Báo cáo</a>
+        <a href="users.html" id="usersLink">Người dùng</a>
+        <a href="search.html">Tra cứu</a>
+      </nav>
+      <div class="user-box">
+        <span id="welcomeUser"></span>
+        <button id="btnLogout" class="btn">Đăng xuất</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero">
+        <h1>Trang chủ</h1>
+        <p>Hệ thống quản lý kho — thao tác nhanh, rõ ràng, bảo mật.</p>
+      </section>
+
+      <section class="grid">
+        <a class="card" href="catalog.html">
+          <h3>Quản lý danh mục</h3>
+          <p>Thiết lập sản phẩm, mã hàng, kho và vị trí.</p>
+        </a>
+        <a class="card" href="operations.html">
+          <h3>Nghiệp vụ kho</h3>
+          <p>Nhập, xuất, kiểm kê theo thời gian thực.</p>
+        </a>
+        <a class="card" href="reports.html">
+          <h3>Báo cáo - Thống kê</h3>
+          <p>Biểu đồ, báo cáo nhập xuất tồn, cảnh báo.</p>
+        </a>
+        <a class="card" id="usersCard" href="users.html">
+          <h3>Quản lý người dùng</h3>
+          <p>Tạo tài khoản, phân quyền theo vai trò.</p>
+        </a>
+        <a class="card" href="search.html">
+          <h3>Tìm kiếm & Tra cứu</h3>
+          <p>Từ khóa, bộ lọc, quét mã vạch/QR.</p>
+        </a>
+      </section>
+
+      <section class="panel">
+        <h2>Công cụ</h2>
+        <div class="row">
+          <button id="btnSeed" class="btn secondary">Thiết lập lại dữ liệu</button>
+          <button id="btnPerfTest" class="btn">Kiểm tra hiệu suất</button>
+        </div>
+        <div id="perfOutput" class="mono"></div>
+      </section>
+    </main>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      guardAuthenticated();
+      const current = getCurrentUser();
+      document.getElementById('welcomeUser').textContent = `${current.fullName} (${current.role})`;
+
+      if (current.role !== 'Admin') {
+        document.getElementById('usersLink').style.display = 'none';
+        document.getElementById('usersCard').style.display = 'none';
+      }
+
+      document.getElementById('btnLogout').onclick = () => logout();
+      document.getElementById('btnSeed').onclick = () => {
+        seedDemoData(true);
+        alert('Dữ liệu mẫu đã được thiết lập lại.');
+      };
+
+      document.getElementById('btnPerfTest').onclick = () => {
+        const t0 = performance.now();
+        // Mô phỏng các thao tác tìm kiếm/CRUD cơ bản
+        const products = storage.get('products', []);
+        const results = products.filter(p => (p.name || '').toLowerCase().includes('a'));
+        // thao tác ghi
+        storage.set('perf_temp', results);
+        storage.remove('perf_temp');
+        const t1 = performance.now();
+        const ms = Math.round(t1 - t0);
+        const msg = `Thời gian phản hồi mô phỏng: ${ms} ms (mục tiêu < 3000 ms)`;
+        document.getElementById('perfOutput').textContent = msg;
+      };
+    </script>
+  </body>
+  </html>
+
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đăng nhập - Quản lý kho</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body class="auth-page">
+    <div class="auth-card">
+      <h1>Đăng nhập hệ thống</h1>
+      <form id="loginForm">
+        <label for="username">Tên đăng nhập</label>
+        <input id="username" name="username" type="text" placeholder="admin" required />
+
+        <label for="password">Mật khẩu</label>
+        <input id="password" name="password" type="password" placeholder="123456" required />
+
+        <button type="submit" class="btn primary">Đăng nhập</button>
+      </form>
+
+      <div class="hint">
+        Tài khoản mẫu: <code>admin</code> / <code>123456</code>
+      </div>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      document.getElementById('loginForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const ok = login(username, password);
+        if (!ok) {
+          alert('Sai tên đăng nhập hoặc mật khẩu.');
+          return;
+        }
+        window.location.href = 'home.html';
+      });
+    </script>
+  </body>
+  </html>
+
+## Ứng dụng web HTML tĩnh: Quản lý kho
+
+Hướng dẫn nhanh:
+- Mở file `index.html` bằng trình duyệt.
+- Đăng nhập với tài khoản mẫu: tài khoản `admin`, mật khẩu `123456`.
+- Sau khi đăng nhập sẽ vào `Trang chủ`, điều hướng đến các module: `Quản lý danh mục`, `Nghiệp vụ kho`, `Báo cáo`, `Người dùng`, `Tra cứu`.
+
+Ghi chú kỹ thuật:
+- Ứng dụng thuần HTML/CSS/JS, không cần cài đặt backend.
+- Dữ liệu mẫu được lưu ở `localStorage` thông qua `assets/data.js`. Có thể reset dữ liệu bằng nút `Thiết lập lại dữ liệu` ở Trang chủ.
+- Phân quyền cơ bản: chỉ `Admin` được truy cập `Quản lý người dùng`.
+

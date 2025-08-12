@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quản lý Hóa đơn</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a href="home.html">Trang chủ</a>
+        <a href="catalog.html">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html">Báo cáo</a>
+        <a href="users.html" id="navUsers">Người dùng</a>
+        <a href="search.html">Tra cứu</a>
+        <a href="customers.html">Khách hàng</a>
+        <a href="invoices.html" class="active">Hóa đơn</a>
+      </aside>
+      <main class="content">
+        <header class="page-header">
+          <h1>Quản lý Hóa đơn</h1>
+          <button id="btnAddInvoice" class="btn primary">+ Hóa đơn mới</button>
+        </header>
+
+        <section class="panel">
+          <div class="row">
+            <input id="searchInvoice" placeholder="Tìm kiếm hóa đơn..." style="flex: 1;" />
+            <select id="typeFilter">
+              <option value="">Tất cả loại</option>
+              <option value="Nhập">Hóa đơn nhập</option>
+              <option value="Xuất">Hóa đơn xuất</option>
+            </select>
+            <select id="statusFilter">
+              <option value="">Tất cả trạng thái</option>
+              <option value="pending">Chờ thanh toán</option>
+              <option value="paid">Đã thanh toán</option>
+              <option value="overdue">Quá hạn</option>
+            </select>
+            <button id="btnSearch" class="btn primary">Tìm kiếm</button>
+          </div>
+          
+          <table class="table" id="tblInvoices">
+            <thead>
+              <tr>
+                <th>Số hóa đơn</th>
+                <th>Khách hàng</th>
+                <th>Loại</th>
+                <th>Ngày phát hành</th>
+                <th>Hạn thanh toán</th>
+                <th>Tổng tiền</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+
+    <!-- Modal thêm/sửa hóa đơn -->
+    <div id="invoiceModal" class="modal hidden">
+      <div class="modal-content" style="max-width: 800px;">
+        <h3 id="modalTitle">Thêm hóa đơn mới</h3>
+        <form id="invoiceForm">
+          <div class="row">
+            <div class="col">
+              <label>Số hóa đơn:</label>
+              <input id="invoiceCode" type="text" required />
+            </div>
+            <div class="col">
+              <label>Khách hàng:</label>
+              <select id="customerCode" required>
+                <option value="">Chọn khách hàng</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label>Loại hóa đơn:</label>
+              <select id="invoiceType" required>
+                <option value="Nhập">Hóa đơn nhập</option>
+                <option value="Xuất">Hóa đơn xuất</option>
+              </select>
+            </div>
+            <div class="col">
+              <label>Ngày phát hành:</label>
+              <input id="issueDate" type="date" required />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label>Hạn thanh toán:</label>
+              <input id="dueDate" type="date" required />
+            </div>
+            <div class="col">
+              <label>Trạng thái:</label>
+              <select id="status" required>
+                <option value="pending">Chờ thanh toán</option>
+                <option value="paid">Đã thanh toán</option>
+                <option value="overdue">Quá hạn</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col" style="flex: 1;">
+              <label>Mô tả:</label>
+              <input id="description" type="text" required />
+            </div>
+          </div>
+          
+          <h4>Chi tiết hóa đơn</h4>
+          <div id="invoiceItems">
+            <div class="invoice-item row">
+              <div class="col">
+                <label>Sản phẩm:</label>
+                <select class="product-select" required>
+                  <option value="">Chọn sản phẩm</option>
+                </select>
+              </div>
+              <div class="col">
+                <label>Số lượng:</label>
+                <input type="number" class="quantity" min="1" required />
+              </div>
+              <div class="col">
+                <label>Đơn giá:</label>
+                <input type="number" class="unit-price" min="0" required />
+              </div>
+              <div class="col">
+                <label>Thành tiền:</label>
+                <input type="text" class="line-total" readonly />
+              </div>
+              <div class="col">
+                <button type="button" class="btn tiny danger remove-item">Xóa</button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <button type="button" id="btnAddItem" class="btn secondary">+ Thêm sản phẩm</button>
+          </div>
+          
+          <div class="invoice-summary">
+            <div class="row">
+              <div class="col">
+                <label>Tổng tiền hàng:</label>
+                <input id="subtotal" type="text" readonly />
+              </div>
+              <div class="col">
+                <label>Thuế VAT (10%):</label>
+                <input id="taxAmount" type="text" readonly />
+              </div>
+              <div class="col">
+                <label>Tổng cộng:</label>
+                <input id="totalAmount" type="text" readonly />
+              </div>
+            </div>
+          </div>
+          
+          <div class="row right">
+            <button type="button" id="btnCancel" class="btn secondary">Hủy</button>
+            <button type="submit" class="btn primary">Lưu</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal xem chi tiết hóa đơn -->
+    <div id="detailModal" class="modal hidden">
+      <div class="modal-content" style="max-width: 900px;">
+        <h3>Chi tiết hóa đơn</h3>
+        <div id="invoiceDetail"></div>
+        <div class="row right">
+          <button id="btnCloseDetail" class="btn secondary">Đóng</button>
+          <button id="btnPrintInvoice" class="btn primary">In hóa đơn</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      guardAuthenticated();
+      const current = getCurrentUser();
+      if(current.role !== 'Admin') document.getElementById('navUsers').style.display = 'none';
+
+      // Load dữ liệu mẫu
+      seedDemoData(false);
+
+      let editingInvoiceId = null;
+
+      // Render danh sách hóa đơn
+      function renderInvoices(invoices = null) {
+        if (!invoices) {
+          invoices = storage.get('invoices', []);
+        }
+        
+        const tbody = document.querySelector('#tblInvoices tbody');
+        tbody.innerHTML = invoices.map(invoice => `
+          <tr>
+            <td><strong>${invoice.code}</strong></td>
+            <td>${invoice.customerName}</td>
+            <td><span class="badge badge-${invoice.type === 'Nhập' ? 'success' : 'warning'}">${invoice.type}</span></td>
+            <td>${formatDate(invoice.issueDate)}</td>
+            <td>${formatDate(invoice.dueDate)}</td>
+            <td class="right">${invoice.totalWithTax.toLocaleString()}đ</td>
+            <td>
+              <span class="status-${invoice.status === 'paid' ? 'đã-thanh-toán' : invoice.status === 'overdue' ? 'quá-hạn' : 'chờ-thanh-toán'}">
+                ${invoice.status === 'paid' ? 'Đã thanh toán' : invoice.status === 'overdue' ? 'Quá hạn' : 'Chờ thanh toán'}
+              </span>
+            </td>
+            <td>
+              <button onclick="viewInvoiceDetail('${invoice.id}')" class="btn tiny">Xem</button>
+              <button onclick="editInvoice('${invoice.id}')" class="btn tiny">Sửa</button>
+              <button onclick="deleteInvoice('${invoice.id}')" class="btn tiny danger">Xóa</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // Format date
+      function formatDate(dateStr) {
+        return new Date(dateStr).toLocaleDateString('vi-VN');
+      }
+
+      // Khởi tạo dropdown khách hàng và sản phẩm
+      function initDropdowns() {
+        const customers = storage.get('customers', []);
+        const products = storage.get('products', []);
+        
+        // Khách hàng dropdown
+        const customerSelect = document.getElementById('customerCode');
+        customerSelect.innerHTML = '<option value="">Chọn khách hàng</option>';
+        customers.forEach(customer => {
+          const option = document.createElement('option');
+          option.value = customer.code;
+          option.textContent = `${customer.code} - ${customer.name}`;
+          customerSelect.appendChild(option);
+        });
+        
+        // Sản phẩm dropdowns
+        document.querySelectorAll('.product-select').forEach(select => {
+          select.innerHTML = '<option value="">Chọn sản phẩm</option>';
+          products.forEach(product => {
+            const option = document.createElement('option');
+            option.value = product.code;
+            option.textContent = `${product.code} - ${product.name}`;
+            option.dataset.price = product.price || 0;
+            select.appendChild(option);
+          });
+        });
+      }
+
+      // Thêm hóa đơn mới
+      function addInvoice() {
+        editingInvoiceId = null;
+        document.getElementById('modalTitle').textContent = 'Thêm hóa đơn mới';
+        document.getElementById('invoiceForm').reset();
+        document.getElementById('invoiceItems').innerHTML = `
+          <div class="invoice-item row">
+            <div class="col">
+              <label>Sản phẩm:</label>
+              <select class="product-select" required>
+                <option value="">Chọn sản phẩm</option>
+              </select>
+            </div>
+            <div class="col">
+              <label>Số lượng:</label>
+              <input type="number" class="quantity" min="1" required />
+            </div>
+            <div class="col">
+              <label>Đơn giá:</label>
+              <input type="number" class="unit-price" min="0" required />
+            </div>
+            <div class="col">
+              <label>Thành tiền:</label>
+              <input type="text" class="line-total" readonly />
+            </div>
+            <div class="col">
+              <button type="button" class="btn tiny danger remove-item">Xóa</button>
+            </div>
+          </div>
+        `;
+        initDropdowns();
+        document.getElementById('invoiceModal').classList.remove('hidden');
+      }
+
+      // Xem chi tiết hóa đơn
+      function viewInvoiceDetail(id) {
+        const invoices = storage.get('invoices', []);
+        const invoice = invoices.find(i => i.id === id);
+        if (!invoice) return;
+
+        const detailHtml = `
+          <div class="invoice-header">
+            <h4>Hóa đơn số: ${invoice.code}</h4>
+            <p><strong>Khách hàng:</strong> ${invoice.customerName}</p>
+            <p><strong>Loại:</strong> ${invoice.type}</p>
+            <p><strong>Ngày phát hành:</strong> ${formatDate(invoice.issueDate)}</p>
+            <p><strong>Hạn thanh toán:</strong> ${formatDate(invoice.dueDate)}</p>
+            <p><strong>Trạng thái:</strong> 
+              <span class="status-${invoice.status === 'paid' ? 'đã-thanh-toán' : invoice.status === 'overdue' ? 'quá-hạn' : 'chờ-thanh-toán'}">
+                ${invoice.status === 'paid' ? 'Đã thanh toán' : invoice.status === 'overdue' ? 'Quá hạn' : 'Chờ thanh toán'}
+              </span>
+            </p>
+            <p><strong>Mô tả:</strong> ${invoice.description}</p>
+          </div>
+          <div class="invoice-items">
+            <h5>Chi tiết hóa đơn</h5>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>STT</th>
+                  <th>Sản phẩm</th>
+                  <th>Số lượng</th>
+                  <th>Đơn giá</th>
+                  <th>Thành tiền</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${invoice.items ? invoice.items.map((item, index) => `
+                  <tr>
+                    <td>${index + 1}</td>
+                    <td>${item.productName}</td>
+                    <td>${item.quantity}</td>
+                    <td class="right">${item.unitPrice.toLocaleString()}đ</td>
+                    <td class="right">${(item.quantity * item.unitPrice).toLocaleString()}đ</td>
+                  </tr>
+                `).join('') : '<tr><td colspan="5">Không có chi tiết</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+          <div class="invoice-summary">
+            <div class="row">
+              <div class="col">
+                <strong>Tổng tiền hàng:</strong> ${invoice.totalAmount.toLocaleString()}đ
+              </div>
+              <div class="col">
+                <strong>Thuế VAT (10%):</strong> ${invoice.taxAmount.toLocaleString()}đ
+              </div>
+              <div class="col">
+                <strong>Tổng cộng:</strong> ${invoice.totalWithTax.toLocaleString()}đ
+              </div>
+            </div>
+          </div>
+        `;
+        
+        document.getElementById('invoiceDetail').innerHTML = detailHtml;
+        document.getElementById('detailModal').classList.remove('hidden');
+      }
+
+      // Sửa hóa đơn
+      function editInvoice(id) {
+        const invoices = storage.get('invoices', []);
+        const invoice = invoices.find(i => i.id === id);
+        if (!invoice) return;
+
+        editingInvoiceId = id;
+        document.getElementById('modalTitle').textContent = 'Sửa hóa đơn';
+        
+        document.getElementById('invoiceCode').value = invoice.code;
+        document.getElementById('customerCode').value = invoice.customerCode;
+        document.getElementById('invoiceType').value = invoice.type;
+        document.getElementById('issueDate').value = invoice.issueDate;
+        document.getElementById('dueDate').value = invoice.dueDate;
+        document.getElementById('status').value = invoice.status;
+        document.getElementById('description').value = invoice.description;
+        
+        // TODO: Load chi tiết hóa đơn
+        document.getElementById('invoiceModal').classList.remove('hidden');
+      }
+
+      // Xóa hóa đơn
+      function deleteInvoice(id) {
+        if (!confirm('Bạn có chắc muốn xóa hóa đơn này?')) return;
+        
+        const invoices = storage.get('invoices', []);
+        const updatedInvoices = invoices.filter(i => i.id !== id);
+        storage.set('invoices', updatedInvoices);
+        renderInvoices();
+      }
+
+      // Tìm kiếm hóa đơn
+      function searchInvoices() {
+        const term = document.getElementById('searchInvoice').value.toLowerCase();
+        const typeFilter = document.getElementById('typeFilter').value;
+        const statusFilter = document.getElementById('statusFilter').value;
+        
+        let invoices = storage.get('invoices', []);
+        
+        if (term) {
+          invoices = invoices.filter(i => 
+            i.code.toLowerCase().includes(term) ||
+            i.customerName.toLowerCase().includes(term) ||
+            i.description.toLowerCase().includes(term)
+          );
+        }
+        
+        if (typeFilter) {
+          invoices = invoices.filter(i => i.type === typeFilter);
+        }
+        
+        if (statusFilter) {
+          invoices = invoices.filter(i => i.status === statusFilter);
+        }
+        
+        renderInvoices(invoices);
+      }
+
+      // Tính toán tổng tiền
+      function calculateTotals() {
+        let subtotal = 0;
+        document.querySelectorAll('.invoice-item').forEach(item => {
+          const quantity = parseFloat(item.querySelector('.quantity').value) || 0;
+          const unitPrice = parseFloat(item.querySelector('.unit-price').value) || 0;
+          const lineTotal = quantity * unitPrice;
+          item.querySelector('.line-total').value = lineTotal.toLocaleString();
+          subtotal += lineTotal;
+        });
+        
+        const taxAmount = subtotal * 0.1;
+        const totalAmount = subtotal + taxAmount;
+        
+        document.getElementById('subtotal').value = subtotal.toLocaleString();
+        document.getElementById('taxAmount').value = taxAmount.toLocaleString();
+        document.getElementById('totalAmount').value = totalAmount.toLocaleString();
+      }
+
+      // Thêm dòng sản phẩm
+      function addInvoiceItem() {
+        const itemsContainer = document.getElementById('invoiceItems');
+        const newItem = document.createElement('div');
+        newItem.className = 'invoice-item row';
+        newItem.innerHTML = `
+          <div class="col">
+            <label>Sản phẩm:</label>
+            <select class="product-select" required>
+              <option value="">Chọn sản phẩm</option>
+            </select>
+          </div>
+          <div class="col">
+            <label>Số lượng:</label>
+            <input type="number" class="quantity" min="1" required />
+          </div>
+          <div class="col">
+            <label>Đơn giá:</label>
+            <input type="number" class="unit-price" min="0" required />
+          </div>
+          <div class="col">
+            <label>Thành tiền:</label>
+            <input type="text" class="line-total" readonly />
+          </div>
+          <div class="col">
+            <button type="button" class="btn tiny danger remove-item">Xóa</button>
+          </div>
+        `;
+        itemsContainer.appendChild(newItem);
+        initDropdowns();
+        
+        // Add event listeners
+        newItem.querySelector('.quantity').oninput = calculateTotals;
+        newItem.querySelector('.unit-price').oninput = calculateTotals;
+        newItem.querySelector('.remove-item').onclick = () => {
+          newItem.remove();
+          calculateTotals();
+        };
+      }
+
+      // Event listeners
+      document.getElementById('btnAddInvoice').onclick = addInvoice;
+      document.getElementById('btnSearch').onclick = searchInvoices;
+      document.getElementById('btnAddItem').onclick = addInvoiceItem;
+      document.getElementById('btnCancel').onclick = () => {
+        document.getElementById('invoiceModal').classList.add('hidden');
+      };
+      document.getElementById('btnCloseDetail').onclick = () => {
+        document.getElementById('detailModal').classList.add('hidden');
+      };
+      document.getElementById('btnPrintInvoice').onclick = () => {
+        window.print();
+      };
+
+      // Tìm kiếm khi nhập
+      document.getElementById('searchInvoice').oninput = searchInvoices;
+      document.getElementById('typeFilter').onchange = searchInvoices;
+      document.getElementById('statusFilter').onchange = searchInvoices;
+
+      // Khởi tạo
+      renderInvoices();
+    </script>
+  </body>
+</html>

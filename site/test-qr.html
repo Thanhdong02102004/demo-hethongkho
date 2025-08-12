@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test QR & Charts - Quản lý kho</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <style>
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #3b82f6;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .test-button:hover {
+            background: #2563eb;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Test Chức Năng QR & Charts</h1>
+        
+        <div class="test-section">
+            <h2>1. Test Thư viện QR Code</h2>
+            <button class="test-button" onclick="testQRCode()">Test QR Code</button>
+            <div id="qrStatus"></div>
+            <div id="qrTest"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. Test Chart.js</h2>
+            <button class="test-button" onclick="testChartJS()">Test Chart.js</button>
+            <div id="chartStatus"></div>
+            <canvas id="testChart" width="400" height="200"></canvas>
+        </div>
+
+        <div class="test-section">
+            <h2>3. Test Storage & Data</h2>
+            <button class="test-button" onclick="testStorage()">Test Storage</button>
+            <div id="storageStatus"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. Test Mã QR Sản phẩm</h2>
+            <button class="test-button" onclick="testProductQR()">Test Mã QR Sản phẩm</button>
+            <div id="productQRStatus"></div>
+            <div id="productQRTest"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. Kết quả tổng hợp</h2>
+            <div id="overallStatus"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>6. Hướng dẫn khắc phục</h2>
+            <div id="troubleshoot"></div>
+        </div>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    
+    <script>
+        let testResults = {
+            qrCode: false,
+            chartJS: false,
+            storage: false,
+            productQR: false
+        };
+
+        function updateOverallStatus() {
+            const overall = document.getElementById('overallStatus');
+            const passed = Object.values(testResults).filter(Boolean).length;
+            const total = Object.keys(testResults).length;
+            
+            if (passed === total) {
+                overall.innerHTML = `<div class="status success">✅ Tất cả test đã PASSED (${passed}/${total})</div>`;
+            } else {
+                overall.innerHTML = `<div class="status error">❌ Test FAILED (${passed}/${total})</div>`;
+            }
+        }
+
+        function testQRCode() {
+            const status = document.getElementById('qrStatus');
+            const testDiv = document.getElementById('qrTest');
+            
+            try {
+                if (typeof QRCode !== 'undefined') {
+                    status.innerHTML = '<div class="status success">✅ QR Code library loaded successfully</div>';
+                    testResults.qrCode = true;
+                    
+                    // Test tạo mã QR đơn giản
+                    QRCode.toCanvas(testDiv, 'Test QR Code', {
+                        width: 200,
+                        margin: 2
+                    }, function (error) {
+                        if (error) {
+                            status.innerHTML = '<div class="status error">❌ QR Code generation failed</div>';
+                            testResults.qrCode = false;
+                        }
+                    });
+                } else {
+                    status.innerHTML = '<div class="status error">❌ QR Code library not loaded</div>';
+                    testResults.qrCode = false;
+                }
+            } catch (error) {
+                status.innerHTML = `<div class="status error">❌ QR Code test error: ${error.message}</div>`;
+                testResults.qrCode = false;
+            }
+            
+            updateOverallStatus();
+        }
+
+        function testChartJS() {
+            const status = document.getElementById('chartStatus');
+            
+            try {
+                if (typeof Chart !== 'undefined') {
+                    status.innerHTML = '<div class="status success">✅ Chart.js loaded successfully</div>';
+                    testResults.chartJS = true;
+                    
+                    // Test tạo biểu đồ đơn giản
+                    new Chart(document.getElementById('testChart'), {
+                        type: 'bar',
+                        data: {
+                            labels: ['Test 1', 'Test 2', 'Test 3'],
+                            datasets: [{
+                                label: 'Test Data',
+                                data: [10, 20, 30],
+                                backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                } else {
+                    status.innerHTML = '<div class="status error">❌ Chart.js not loaded</div>';
+                    testResults.chartJS = false;
+                }
+            } catch (error) {
+                status.innerHTML = `<div class="status error">❌ Chart.js test error: ${error.message}</div>`;
+                testResults.chartJS = false;
+            }
+            
+            updateOverallStatus();
+        }
+
+        function testStorage() {
+            const status = document.getElementById('storageStatus');
+            
+            try {
+                if (typeof storage !== 'undefined') {
+                    status.innerHTML = '<div class="status success">✅ Storage utility loaded successfully</div>';
+                    testResults.storage = true;
+                    
+                    // Test seed data
+                    if (typeof seedDemoData === 'function') {
+                        status.innerHTML += '<div class="status success">✅ seedDemoData function available</div>';
+                    } else {
+                        status.innerHTML += '<div class="status error">❌ seedDemoData function not found</div>';
+                    }
+                } else {
+                    status.innerHTML = '<div class="status error">❌ Storage utility not loaded</div>';
+                    testResults.storage = false;
+                }
+            } catch (error) {
+                status.innerHTML = `<div class="status error">❌ Storage test error: ${error.message}</div>`;
+                testResults.storage = false;
+            }
+            
+            updateOverallStatus();
+        }
+
+        function testProductQR() {
+            const status = document.getElementById('productQRStatus');
+            const testDiv = document.getElementById('productQRTest');
+            
+            try {
+                // Tạo sản phẩm test
+                const testProduct = {
+                    id: 'test-123',
+                    code: 'TEST001',
+                    name: 'Sản phẩm Test',
+                    uom: 'Cái',
+                    manufacturer: 'Công ty Test',
+                    description: 'Sản phẩm test cho mã QR'
+                };
+                
+                const productInfo = {
+                    ...testProduct,
+                    onHand: 100,
+                    lastUpdated: new Date().toISOString()
+                };
+                
+                const qrData = JSON.stringify(productInfo, null, 2);
+                
+                // Tạo mã QR
+                QRCode.toCanvas(testDiv, qrData, {
+                    width: 200,
+                    margin: 2
+                }, function (error) {
+                    if (error) {
+                        status.innerHTML = `<div class="status error">❌ Product QR generation failed: ${error.message}</div>`;
+                        testResults.productQR = false;
+                    } else {
+                        status.innerHTML = '<div class="status success">✅ Product QR generated successfully</div>';
+                        testResults.productQR = true;
+                    }
+                    updateOverallStatus();
+                });
+                
+            } catch (error) {
+                status.innerHTML = `<div class="status error">❌ Product QR test error: ${error.message}</div>`;
+                testResults.productQR = false;
+                updateOverallStatus();
+            }
+        }
+
+        function updateTroubleshoot() {
+            const troubleshoot = document.getElementById('troubleshoot');
+            let issues = [];
+            
+            if (!testResults.qrCode) {
+                issues.push('QR Code library không load được - kiểm tra kết nối internet');
+            }
+            if (!testResults.chartJS) {
+                issues.push('Chart.js không load được - kiểm tra kết nối internet');
+            }
+            if (!testResults.storage) {
+                issues.push('Storage utility không load được - kiểm tra file storage.js');
+            }
+            if (!testResults.productQR) {
+                issues.push('Mã QR sản phẩm không tạo được - kiểm tra dữ liệu và QR library');
+            }
+            
+            if (issues.length === 0) {
+                troubleshoot.innerHTML = '<div class="status success">🎉 Không có vấn đề gì! Hệ thống hoạt động bình thường.</div>';
+            } else {
+                troubleshoot.innerHTML = '<div class="status error"><strong>Các vấn đề cần khắc phục:</strong><ul>' + 
+                    issues.map(issue => `<li>${issue}</li>`).join('') + '</ul></div>';
+            }
+        }
+
+        // Auto-run tests when page loads
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                testQRCode();
+                testChartJS();
+                testStorage();
+                testProductQR();
+                updateTroubleshoot();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

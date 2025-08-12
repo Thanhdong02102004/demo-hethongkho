@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Người dùng hệ thống</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a href="home.html">Trang chủ</a>
+        <a href="catalog.html">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html">Báo cáo</a>
+        <a href="users.html" class="active">Người dùng</a>
+        <a href="search.html">Tra cứu</a>
+        <a href="customers.html">Khách hàng</a>
+        <a href="invoices.html">Hóa đơn</a>
+      </aside>
+      <main class="content">
+        <header class="page-header"><h1>Quản lý người dùng hệ thống</h1><div class="grow"></div><button id="btnAddUser" class="btn primary">+ Tài khoản</button></header>
+        <section class="panel">
+          <table class="table" id="tblUsers"><thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th></th></tr></thead><tbody></tbody></table>
+        </section>
+      </main>
+    </div>
+    <div id="modal" class="modal hidden"><div class="modal-content"><h3 id="modalTitle"></h3><form id="modalForm"></form><div class="row right"><button id="btnClose" class="btn">Đóng</button><button id="btnSave" class="btn primary">Lưu</button></div></div></div>
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      guardAuthenticated('Admin');
+      function render(){ const tb=document.querySelector('#tblUsers tbody'); const users=storage.get('users',[]); tb.innerHTML = users.map(u=>`<tr><td>${u.username}</td><td>${u.fullName}</td><td>${u.role}</td><td>${u.active?'Hoạt động':'Khóa'}</td><td class=right><button class="btn tiny" onclick="editUser('${u.id}')">Sửa</button> <button class="btn tiny danger" onclick="deleteUser('${u.id}')">Xóa</button></td></tr>`).join(''); }
+      function openModal(title,html,onSave){ modalTitle.textContent=title; modalForm.innerHTML=html; document.getElementById('modal').classList.remove('hidden'); btnSave.onclick=()=>{onSave(new FormData(modalForm)); close();}; btnClose.onclick=close; function close(){document.getElementById('modal').classList.add('hidden');}}
+      btnAddUser.onclick=()=>openModal('Thêm tài khoản',`<label>Tên đăng nhập</label><input name=username required /><label>Mật khẩu</label><input name=password type=password required /><label>Họ tên</label><input name=fullName /><label>Vai trò</label><select name=role><option>Admin</option><option>Manager</option><option>Staff</option></select><label><input type=checkbox name=active checked/> Hoạt động</label>`,fd=>{const users=storage.get('users',[]); users.push({id:crypto.randomUUID(),username:fd.get('username'),password:fd.get('password'),fullName:fd.get('fullName')||fd.get('username'),role:fd.get('role'),active:fd.get('active')==='on'}); storage.set('users',users); render();});
+      window.editUser=(id)=>{ const users=storage.get('users',[]); const u=users.find(x=>x.id===id); openModal('Cập nhật tài khoản',`<label>Tên đăng nhập</label><input name=username value="${u.username}" required /><label>Mật khẩu mới</label><input name=password type=password placeholder="(bỏ trống nếu giữ nguyên)" /><label>Họ tên</label><input name=fullName value="${u.fullName}" /><label>Vai trò</label><select name=role><option ${u.role==='Admin'?'selected':''}>Admin</option><option ${u.role==='Manager'?'selected':''}>Manager</option><option ${u.role==='Staff'?'selected':''}>Staff</option></select><label><input type=checkbox name=active ${u.active?'checked':''}/> Hoạt động</label>`,fd=>{u.username=fd.get('username'); if(fd.get('password')) u.password=fd.get('password'); u.fullName=fd.get('fullName'); u.role=fd.get('role'); u.active=fd.get('active')==='on'; storage.set('users',users); render();}); };
+      window.deleteUser=(id)=>{ if(!confirm('Xóa tài khoản này?')) return; const users=storage.get('users',[]).filter(u=>u.id!==id); storage.set('users',users); render(); };
+      render();
+    </script>
+  </body>
+  </html>
+
+

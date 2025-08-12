@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý bảo trì kho - Quản lý kho</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <style>
+        .maintenance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .maintenance-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #f59e0b;
+        }
+        .maintenance-card h3 {
+            margin-top: 0;
+            color: #92400e;
+        }
+        .maintenance-form {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #374151;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .btn-success { background: #10b981; }
+        .btn-warning { background: #f59e0b; }
+        .btn-danger { background: #ef4444; }
+        .btn-info { background: #06b6d4; }
+        .maintenance-table {
+            margin-top: 20px;
+        }
+        .maintenance-table th {
+            background: #f3f4f6;
+            font-weight: 600;
+        }
+        .status-pending { color: #f59e0b; font-weight: bold; }
+        .status-inprogress { color: #3b82f6; font-weight: bold; }
+        .status-completed { color: #10b981; font-weight: bold; }
+        .status-cancelled { color: #ef4444; font-weight: bold; }
+        .priority-high { background: #fee2e2; color: #991b1b; }
+        .priority-medium { background: #fef3c7; color: #92400e; }
+        .priority-low { background: #d1fae5; color: #065f46; }
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <a href="home.html">Trang chủ</a>
+            <a href="catalog.html">Danh mục</a>
+            <a href="operations.html">Nghiệp vụ kho</a>
+            <a href="reports.html">Báo cáo</a>
+            <a href="users.html" id="navUsers">Người dùng</a>
+            <a href="search.html">Tra cứu</a>
+            <a href="customers.html">Khách hàng</a>
+            <a href="invoices.html">Hóa đơn</a>
+            <a href="locations.html">Vị trí kho</a>
+            <a href="maintenance.html" class="active">Bảo trì kho</a>
+        </aside>
+        <main class="content">
+            <header class="page-header">
+                <h1>🔧 Quản lý bảo trì kho</h1>
+                <div class="grow"></div>
+                <button id="btnRefresh" class="btn secondary">🔄 Làm mới</button>
+            </header>
+
+            <!-- Thống kê bảo trì -->
+            <section class="quick-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalMaintenance">0</div>
+                    <div class="stat-label">Tổng yêu cầu</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="pendingMaintenance">0</div>
+                    <div class="stat-label">Chờ xử lý</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="inProgressMaintenance">0</div>
+                    <div class="stat-label">Đang thực hiện</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="completedMaintenance">0</div>
+                    <div class="stat-label">Hoàn thành</div>
+                </div>
+            </section>
+
+            <!-- Tabs chính -->
+            <section class="tabs">
+                <button class="tab active" data-tab="plan">📋 Lập kế hoạch</button>
+                <button class="tab" data-tab="track">📊 Theo dõi</button>
+                <button class="tab" data-tab="incident">🚨 Báo cáo sự cố</button>
+                <button class="tab" data-tab="staff">👷 Nhân viên</button>
+            </section>
+
+            <!-- Lập kế hoạch bảo trì -->
+            <section id="plan" class="panel">
+                <h2>📋 Lập kế hoạch bảo trì</h2>
+                <div class="maintenance-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Kho cần bảo trì</label>
+                            <select id="maintenanceWh" required title="Chọn kho cần bảo trì">
+                                <option value="">Chọn kho...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Loại bảo trì</label>
+                            <select id="maintenanceType" required title="Chọn loại bảo trì">
+                                <option value="">Chọn loại...</option>
+                                <option value="PREVENTIVE">Bảo trì phòng ngừa</option>
+                                <option value="CORRECTIVE">Bảo trì sửa chữa</option>
+                                <option value="EMERGENCY">Bảo trì khẩn cấp</option>
+                                <option value="INSPECTION">Kiểm tra định kỳ</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Mức độ ưu tiên</label>
+                            <select id="maintenancePriority" required title="Chọn mức độ ưu tiên">
+                                <option value="">Chọn mức độ...</option>
+                                <option value="HIGH">Cao</option>
+                                <option value="MEDIUM">Trung bình</option>
+                                <option value="LOW">Thấp</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ngày bắt đầu</label>
+                            <input type="date" id="maintenanceStartDate" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Ngày dự kiến hoàn thành</label>
+                            <input type="date" id="maintenanceEndDate" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Người phụ trách</label>
+                            <select id="maintenanceStaff" required title="Chọn nhân viên phụ trách">
+                                <option value="">Chọn nhân viên...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Mô tả công việc</label>
+                            <textarea id="maintenanceDescription" rows="3" placeholder="Mô tả chi tiết công việc bảo trì" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Vật tư cần thiết</label>
+                            <textarea id="maintenanceMaterials" rows="3" placeholder="Danh sách vật tư, thiết bị cần thiết"></textarea>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button id="btnCreateMaintenance" class="btn btn-success">📋 Tạo kế hoạch</button>
+                        <button id="btnUpdateMaintenance" class="btn btn-warning" style="display: none;">✏️ Cập nhật</button>
+                        <button id="btnClearMaintenance" class="btn secondary">🗑️ Xóa trắng</button>
+                    </div>
+                </div>
+                
+                <h3>Danh sách kế hoạch bảo trì</h3>
+                <table class="table maintenance-table" id="tblMaintenance">
+                    <thead>
+                        <tr>
+                            <th>Mã</th>
+                            <th>Kho</th>
+                            <th>Loại</th>
+                            <th>Mức độ</th>
+                            <th>Ngày bắt đầu</th>
+                            <th>Ngày hoàn thành</th>
+                            <th>Người phụ trách</th>
+                            <th>Trạng thái</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+
+            <!-- Theo dõi tiến độ -->
+            <section id="track" class="panel hidden">
+                <h2>📊 Theo dõi tiến độ bảo trì</h2>
+                <div class="maintenance-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Chọn kế hoạch bảo trì</label>
+                            <select id="trackMaintenance" required title="Chọn kế hoạch bảo trì để theo dõi">
+                                <option value="">Chọn kế hoạch...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Trạng thái hiện tại</label>
+                            <select id="trackStatus" required title="Cập nhật trạng thái">
+                                <option value="">Chọn trạng thái...</option>
+                                <option value="PENDING">Chờ xử lý</option>
+                                <option value="INPROGRESS">Đang thực hiện</option>
+                                <option value="COMPLETED">Hoàn thành</option>
+                                <option value="CANCELLED">Đã hủy</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Tiến độ (%)</label>
+                            <input type="number" id="trackProgress" placeholder="0" min="0" max="100" step="5" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ghi chú tiến độ</label>
+                            <textarea id="trackNotes" rows="3" placeholder="Ghi chú về tiến độ thực hiện"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Ngày cập nhật</label>
+                            <input type="date" id="trackUpdateDate" />
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button id="btnUpdateProgress" class="btn btn-info">📊 Cập nhật tiến độ</button>
+                        <button id="btnCompleteMaintenance" class="btn btn-success">✅ Hoàn thành</button>
+                        <button id="btnCancelMaintenance" class="btn btn-danger">❌ Hủy bỏ</button>
+                    </div>
+                </div>
+                
+                <div class="maintenance-grid">
+                    <div class="maintenance-card">
+                        <h3>📈 Tiến độ tổng quan</h3>
+                        <div id="progressOverview"></div>
+                    </div>
+                    <div class="maintenance-card">
+                        <h3>⏰ Lịch trình</h3>
+                        <div id="maintenanceSchedule"></div>
+                    </div>
+                </div>
+                
+                <h3>Lịch sử cập nhật</h3>
+                <table class="table maintenance-table" id="tblProgressHistory">
+                    <thead>
+                        <tr>
+                            <th>Ngày</th>
+                            <th>Trạng thái</th>
+                            <th>Tiến độ</th>
+                            <th>Ghi chú</th>
+                            <th>Người cập nhật</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+
+            <!-- Báo cáo sự cố -->
+            <section id="incident" class="panel hidden">
+                <h2>🚨 Báo cáo sự cố</h2>
+                <div class="maintenance-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Kho xảy ra sự cố</label>
+                            <select id="incidentWh" required title="Chọn kho xảy ra sự cố">
+                                <option value="">Chọn kho...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Loại sự cố</label>
+                            <select id="incidentType" required title="Chọn loại sự cố">
+                                <option value="">Chọn loại...</option>
+                                <option value="EQUIPMENT">Thiết bị hỏng</option>
+                                <option value="STRUCTURE">Kết cấu kho</option>
+                                <option value="SAFETY">An toàn</option>
+                                <option value="ENVIRONMENT">Môi trường</option>
+                                <option value="OTHER">Khác</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Mức độ nghiêm trọng</label>
+                            <select id="incidentSeverity" required title="Chọn mức độ nghiêm trọng">
+                                <option value="">Chọn mức độ...</option>
+                                <option value="CRITICAL">Nghiêm trọng</option>
+                                <option value="HIGH">Cao</option>
+                                <option value="MEDIUM">Trung bình</option>
+                                <option value="LOW">Thấp</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Thời gian xảy ra</label>
+                            <input type="datetime-local" id="incidentTime" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Người báo cáo</label>
+                            <input id="incidentReporter" placeholder="Tên người báo cáo" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Số điện thoại liên hệ</label>
+                            <input type="tel" id="incidentPhone" placeholder="Số điện thoại" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Mô tả sự cố</label>
+                            <textarea id="incidentDescription" rows="4" placeholder="Mô tả chi tiết sự cố xảy ra" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Hành động khắc phục</label>
+                            <textarea id="incidentAction" rows="4" placeholder="Các hành động đã thực hiện để khắc phục"></textarea>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button id="btnReportIncident" class="btn btn-danger">🚨 Báo cáo sự cố</button>
+                        <button id="btnIncidentClear" class="btn secondary">🗑️ Xóa trắng</button>
+                    </div>
+                </div>
+                
+                <h3>Danh sách sự cố</h3>
+                <table class="table maintenance-table" id="tblIncidents">
+                    <thead>
+                        <tr>
+                            <th>Mã sự cố</th>
+                            <th>Kho</th>
+                            <th>Loại</th>
+                            <th>Mức độ</th>
+                            <th>Thời gian</th>
+                            <th>Người báo cáo</th>
+                            <th>Trạng thái</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+
+            <!-- Quản lý nhân viên -->
+            <section id="staff" class="panel hidden">
+                <h2>👷 Quản lý nhân viên bảo trì</h2>
+                <div class="maintenance-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Họ và tên</label>
+                            <input id="staffName" placeholder="Họ và tên nhân viên" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Mã nhân viên</label>
+                            <input id="staffCode" placeholder="NV-BT-001" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Chức vụ</label>
+                            <select id="staffPosition" required title="Chọn chức vụ">
+                                <option value="">Chọn chức vụ...</option>
+                                <option value="TECHNICIAN">Kỹ thuật viên</option>
+                                <option value="ENGINEER">Kỹ sư</option>
+                                <option value="SUPERVISOR">Giám sát</option>
+                                <option value="MANAGER">Quản lý</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Chuyên môn</label>
+                            <select id="staffSpecialty" required title="Chọn chuyên môn">
+                                <option value="">Chọn chuyên môn...</option>
+                                <option value="ELECTRICAL">Điện</option>
+                                <option value="MECHANICAL">Cơ khí</option>
+                                <option value="HVAC">Điều hòa</option>
+                                <option value="STRUCTURE">Kết cấu</option>
+                                <option value="GENERAL">Tổng hợp</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Số điện thoại</label>
+                            <input type="tel" id="staffPhone" placeholder="Số điện thoại" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="staffEmail" placeholder="email@example.com" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Trạng thái</label>
+                            <select id="staffStatus" required title="Chọn trạng thái">
+                                <option value="ACTIVE">Đang làm việc</option>
+                                <option value="INACTIVE">Tạm nghỉ</option>
+                                <option value="RESIGNED">Đã nghỉ việc</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Ghi chú</label>
+                            <textarea id="staffNote" rows="2" placeholder="Ghi chú về nhân viên"></textarea>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button id="btnAddStaff" class="btn btn-success">👷 Thêm nhân viên</button>
+                        <button id="btnUpdateStaff" class="btn btn-warning" style="display: none;">✏️ Cập nhật</button>
+                        <button id="btnStaffClear" class="btn secondary">🗑️ Xóa trắng</button>
+                    </div>
+                </div>
+                
+                <h3>Danh sách nhân viên bảo trì</h3>
+                <table class="table maintenance-table" id="tblStaff">
+                    <thead>
+                        <tr>
+                            <th>Mã NV</th>
+                            <th>Họ tên</th>
+                            <th>Chức vụ</th>
+                            <th>Chuyên môn</th>
+                            <th>Số điện thoại</th>
+                            <th>Trạng thái</th>
+                            <th>Công việc hiện tại</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+        guardAuthenticated();
+        const current = getCurrentUser();
+        if (current.role !== 'Admin') document.getElementById('navUsers').style.display = 'none';
+
+        // Khởi tạo dữ liệu
+        const warehouses = storage.get('warehouses', []);
+        const maintenancePlans = storage.get('maintenancePlans', []);
+        const incidents = storage.get('incidents', []);
+        const maintenanceStaff = storage.get('maintenanceStaff', []);
+
+        // Cập nhật thống kê nhanh
+        function updateQuickStats() {
+            const totalMaintenance = maintenancePlans.length;
+            const pendingMaintenance = maintenancePlans.filter(m => m.status === 'PENDING').length;
+            const inProgressMaintenance = maintenancePlans.filter(m => m.status === 'INPROGRESS').length;
+            const completedMaintenance = maintenancePlans.filter(m => m.status === 'COMPLETED').length;
+
+            document.getElementById('totalMaintenance').textContent = totalMaintenance.toLocaleString('vi-VN');
+            document.getElementById('pendingMaintenance').textContent = pendingMaintenance.toLocaleString('vi-VN');
+            document.getElementById('inProgressMaintenance').textContent = inProgressMaintenance.toLocaleString('vi-VN');
+            document.getElementById('completedMaintenance').textContent = completedMaintenance.toLocaleString('vi-VN');
+        }
+
+        // Khởi tạo form
+        function initializeForms() {
+            // Populate warehouse selects
+            const warehouseOptions = warehouses.map(w => 
+                `<option value="${w.id}">${w.code} - ${w.name}</option>`
+            ).join('');
+            
+            ['maintenanceWh', 'trackMaintenance', 'incidentWh'].forEach(id => {
+                if (document.getElementById(id)) {
+                    document.getElementById(id).innerHTML = '<option value="">Chọn kho...</option>' + warehouseOptions;
+                }
+            });
+
+            // Set default dates
+            const today = new Date().toISOString().split('T')[0];
+            ['maintenanceStartDate', 'maintenanceEndDate', 'trackUpdateDate'].forEach(id => {
+                if (document.getElementById(id)) {
+                    document.getElementById(id).value = today;
+                }
+            });
+
+            // Set default incident time
+            if (document.getElementById('incidentTime')) {
+                const now = new Date();
+                now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                document.getElementById('incidentTime').value = now.toISOString().slice(0, 16);
+            }
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
+                
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.remove('hidden');
+            });
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeForms();
+            updateQuickStats();
+        });
+
+        // Refresh button
+        document.getElementById('btnRefresh').addEventListener('click', function() {
+            updateQuickStats();
+            alert('Đã làm mới dữ liệu!');
+        });
+    </script>
+</body>
+</html>

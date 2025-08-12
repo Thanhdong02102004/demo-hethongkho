@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Báo cáo - Quản lý kho</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a href="home.html">Trang chủ</a>
+        <a href="catalog.html">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html" class="active">Báo cáo</a>
+        <a href="users.html" id="navUsers">Người dùng</a>
+        <a href="search.html">Tra cứu</a>
+        <a href="customers.html">Khách hàng</a>
+        <a href="invoices.html">Hóa đơn</a>
+      </aside>
+      <main class="content">
+        <header class="page-header">
+          <h1>Báo cáo - Thống kê</h1>
+          <div class="grow"></div>
+          <button id="btnExportReport" class="btn secondary">Xuất CSV</button>
+        </header>
+        <section class="panel">
+          <div class="row">
+            <label for="reportWh" class="visually-hidden">Chọn kho</label>
+            <select id="reportWh" title="Chọn kho"></select>
+            <input type="date" id="fromDate" placeholder="Từ ngày" />
+            <input type="date" id="toDate" placeholder="Đến ngày" />
+            <button id="btnRun" class="btn primary">Chạy báo cáo</button>
+          </div>
+          <table class="table" id="tblRpt">
+            <thead>
+              <tr>
+                <th>Sản phẩm</th>
+                <th class="right">Nhập</th>
+                <th class="right">Xuất</th>
+                <th class="right">Tồn</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+        <section class="panel">
+          <h2>Tính chi phí lưu kho theo diện tích (m²)</h2>
+          <div class="row">
+            <label for="costWh" class="visually-hidden">Chọn kho</label>
+            <select id="costWh" title="Chọn kho"></select>
+            <input type="number" id="costArea" placeholder="Diện tích thuê (m²)" min="0" />
+            <input type="number" id="costMonths" placeholder="Số tháng" min="1" />
+            <button id="btnCalcCost" class="btn primary">Tính chi phí</button>
+          </div>
+          <div class="row">
+            <select id="costWh"></select>
+            <input type="number" id="costArea" placeholder="Diện tích thuê (m²)" />
+            <input type="number" id="costMonths" placeholder="Số tháng" />
+            <button id="btnCalcCost" class="btn primary">Tính chi phí</button>
+          </div>
+          <div id="costResult" class="mono"></div>
+        </section>
+        
+        <section class="panel">
+          <h2>Quản lý đơn giá thuê kho</h2>
+          <div class="row">
+            <button id="btnAddWarehouseType" class="btn primary">+ Loại kho mới</button>
+            <button id="btnUpdatePrices" class="btn secondary">Cập nhật giá thuê</button>
+          </div>
+          <table class="table" id="tblWarehousePrices">
+            <thead>
+              <tr>
+                <th>Mã kho</th>
+                <th>Tên kho</th>
+                <th>Loại</th>
+                <th class="right">Đơn giá (đ/m²/tháng)</th>
+                <th>Kho lạnh</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+
+    <div id="modal" class="modal hidden">
+      <div class="modal-content">
+        <h3 id="modalTitle"></h3>
+        <form id="modalForm"></form>
+        <div class="row right">
+          <button id="btnCloseModal" class="btn">Đóng</button>
+          <button id="btnSaveModal" class="btn primary">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      guardAuthenticated(); const current=getCurrentUser(); if(current.role!=='Admin') document.getElementById('navUsers').style.display='none';
+      const products=storage.get('products',[]);
+      let warehouses=storage.get('warehouses',[]);
+      
+      function refreshSelects() {
+        warehouses = storage.get('warehouses',[]);
+        reportWh.innerHTML = warehouses.map(w=>`<option value="${w.id}">${w.code} - ${w.name}</option>`).join('');
+        costWh.innerHTML = warehouses.map(w=>`<option value="${w.id}" data-price="${w.pricePerM2||0}">${w.code} - ${w.name} (${(w.pricePerM2||0).toLocaleString('vi-VN')} đ/m²/tháng)</option>`).join('');
+      }
+      
+      function renderWarehousePrices() {
+        const tbody = document.querySelector('#tblWarehousePrices tbody');
+        const rows = warehouses.map(w => `
+          <tr>
+            <td>${w.code}</td>
+            <td>${w.name}</td>
+            <td>${w.type || 'Thường'}</td>
+            <td class="right">${(w.pricePerM2||0).toLocaleString('vi-VN')}</td>
+            <td>${w.isCold ? 'Có' : 'Không'}</td>
+            <td class="right">
+              <button class="btn tiny" onclick="editWarehousePrice('${w.id}')">Sửa giá</button>
+              <button class="btn tiny secondary" onclick="editWarehouseType('${w.id}')">Sửa loại</button>
+            </td>
+          </tr>
+        `).join('');
+        tbody.innerHTML = rows || '<tr><td colspan="6" class="muted">Không có dữ liệu</td></tr>';
+      }
+      
+      function openModal(title, html, onSave) {
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalForm').innerHTML = html;
+        document.getElementById('modal').classList.remove('hidden');
+        document.getElementById('btnSaveModal').onclick = () => {
+          const fd = new FormData(document.getElementById('modalForm'));
+          onSave(fd);
+          closeModal();
+        };
+        document.getElementById('btnCloseModal').onclick = closeModal;
+      }
+      
+      function closeModal() {
+        document.getElementById('modal').classList.add('hidden');
+      }
+      
+      refreshSelects();
+      renderWarehousePrices();
+      
+      btnRun.onclick=run; btnExportReport.onclick=exportCsv;
+      
+      btnCalcCost.onclick=()=>{
+        const wh=warehouses.find(w=>w.id===costWh.value);
+        const area=Number(costArea.value||0);
+        const months=Number(costMonths.value||1);
+        const total=(wh.pricePerM2||0)*area*months;
+        costResult.textContent = `Kho ${wh.code} (${wh.type||'Thường'}) — Đơn giá: ${(wh.pricePerM2||0).toLocaleString('vi-VN')} đ/m²/tháng → Diện tích ${area.toLocaleString('vi-VN')} m² × ${months} tháng = ${total.toLocaleString('vi-VN')} đ`;
+      };
+      
+      // Quản lý giá thuê
+      window.editWarehousePrice = (id) => {
+        const wh = warehouses.find(w => w.id === id);
+        openModal('Cập nhật đơn giá thuê', `
+          <label>Kho: ${wh.code} - ${wh.name}</label>
+          <label>Đơn giá mới (đ/m²/tháng)</label>
+          <input type="number" name="pricePerM2" value="${wh.pricePerM2||0}" required />
+          <label>Ghi chú thay đổi</label>
+          <input name="priceNote" placeholder="VD: Điều chỉnh theo thị trường..." />
+        `, fd => {
+          wh.pricePerM2 = Number(fd.get('pricePerM2') || 0);
+          wh.priceNote = fd.get('priceNote') || '';
+          wh.priceUpdatedAt = new Date().toISOString();
+          storage.set('warehouses', warehouses);
+          refreshSelects();
+          renderWarehousePrices();
+          alert(`Đã cập nhật giá thuê kho ${wh.code}: ${wh.pricePerM2.toLocaleString('vi-VN')} đ/m²/tháng`);
+        });
+      };
+      
+      window.editWarehouseType = (id) => {
+        const wh = warehouses.find(w => w.id === id);
+        const warehouseTypes = storage.get('warehouseTypes', ['Thường', 'Lạnh', 'Nguy hiểm', 'Cao cấp', 'Tự động']);
+        openModal('Cập nhật loại kho', `
+          <label>Kho: ${wh.code} - ${wh.name}</label>
+          <label>Loại kho</label>
+          <select name="type">
+            ${warehouseTypes.map(t => `<option value="${t}" ${(wh.type||'Thường')===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+          <label><input type="checkbox" name="isCold" ${wh.isCold?'checked':''} /> Kho lạnh</label>
+        `, fd => {
+          wh.type = fd.get('type') || 'Thường';
+          wh.isCold = fd.get('isCold') === 'on';
+          storage.set('warehouses', warehouses);
+          refreshSelects();
+          renderWarehousePrices();
+        });
+      };
+      
+      // Thêm loại kho mới
+      document.getElementById('btnAddWarehouseType').onclick = () => {
+        openModal('Thêm loại kho mới', `
+          <label>Tên loại kho</label>
+          <input name="typeName" placeholder="VD: Kho xuất khẩu, Kho đông lạnh..." required />
+        `, fd => {
+          const typeName = fd.get('typeName').trim();
+          if (!typeName) return;
+          const types = storage.get('warehouseTypes', ['Thường', 'Lạnh', 'Nguy hiểm', 'Cao cấp', 'Tự động']);
+          if (!types.includes(typeName)) {
+            types.push(typeName);
+            storage.set('warehouseTypes', types);
+            alert(`Đã thêm loại kho: ${typeName}`);
+          } else {
+            alert('Loại kho này đã tồn tại');
+          }
+        });
+      };
+      
+      // Cập nhật giá hàng loạt
+      document.getElementById('btnUpdatePrices').onclick = () => {
+        openModal('Cập nhật giá hàng loạt', `
+          <label>Tỷ lệ thay đổi (%)</label>
+          <input type="number" name="percentage" placeholder="VD: 10 (tăng 10%), -5 (giảm 5%)" required />
+          <label>Áp dụng cho loại kho</label>
+          <select name="targetType">
+            <option value="">Tất cả kho</option>
+            ${(storage.get('warehouseTypes', ['Thường', 'Lạnh'])).map(t => `<option value="${t}">${t}</option>`).join('')}
+          </select>
+        `, fd => {
+          const percentage = Number(fd.get('percentage') || 0);
+          const targetType = fd.get('targetType');
+          let count = 0;
+          warehouses.forEach(wh => {
+            if (!targetType || (wh.type||'Thường') === targetType) {
+              wh.pricePerM2 = Math.round((wh.pricePerM2 || 0) * (1 + percentage/100));
+              count++;
+            }
+          });
+          storage.set('warehouses', warehouses);
+          refreshSelects();
+          renderWarehousePrices();
+          alert(`Đã cập nhật giá cho ${count} kho với tỷ lệ ${percentage}%`);
+        });
+      };
+      function run(){ const wh=reportWh.value; const from=new Date(fromDate.value||'1970-01-01'); const to=new Date(toDate.value||'2999-12-31'); const txs=storage.get('transactions',[]).filter(t=>t.warehouseId===wh).filter(t=>{const d=new Date(t.createdAt); return d>=from&&d<=to;}); const map=new Map(); products.forEach(p=>map.set(p.id,{in:0,out:0})); txs.forEach(t=>t.lines.forEach(l=>{const r=map.get(l.productId)||{in:0,out:0}; if(t.type==='IN') r.in+=l.qty; else r.out+=l.qty; map.set(l.productId,r);})); const rows=products.map(p=>{const r=map.get(p.id)||{in:0,out:0}; return `<tr><td>${p.code} - ${p.name}</td><td class=right>${r.in}</td><td class=right>${r.out}</td><td class=right>${r.in-r.out}</td></tr>`}).join(''); document.querySelector('#tblRpt tbody').innerHTML=rows; }
+      function exportCsv(){ const rows=[['Sản phẩm','Nhập','Xuất','Tồn']]; document.querySelectorAll('#tblRpt tbody tr').forEach(tr=>rows.push(Array.from(tr.children).map(td=>td.textContent))); const csv=rows.map(r=>r.map(v=>'"'+v.replaceAll('"','""')+'"').join(',')).join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})); a.download='baocao.csv'; a.click(); }
+    </script>
+  </body>
+  </html>
+
+

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Danh mục - Quản lý kho</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a href="home.html">Trang chủ</a>
+        <a href="catalog.html" class="active">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html">Báo cáo</a>
+        <a href="users.html" id="navUsers">Người dùng</a>
+        <a href="search.html">Tra cứu</a>
+        <a href="customers.html">Khách hàng</a>
+        <a href="invoices.html">Hóa đơn</a>
+      </aside>
+      <main class="content">
+        <header class="page-header">
+          <h1>Quản lý danh mục</h1>
+          <div class="grow"></div>
+          <a href="qr-demo.html" class="btn secondary" target="_blank">📱 Demo QR</a>
+          <button id="btnAddProduct" class="btn primary">+ Sản phẩm</button>
+          <button id="btnAddSku" class="btn">+ Mã hàng</button>
+          <button id="btnAddUom" class="btn">+ Đơn vị tính</button>
+          <button id="btnAddWarehouse" class="btn">+ Kho</button>
+          <button id="btnAddLocation" class="btn">+ Vị trí</button>
+          <button id="btnExport" class="btn secondary">Xuất CSV</button>
+        </header>
+
+        <section class="panel">
+          <h2>Sản phẩm</h2>
+          <div class="row"><input id="filterProducts" placeholder="Lọc theo tên hoặc mã..." /></div>
+          <table class="table" id="tblProducts">
+            <thead><tr><th>Mã</th><th>Tên</th><th>ĐVT</th><th>Mã vạch</th><th>Công ty SX</th><th class="right">Thao tác</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </section>
+
+        <section class="panel">
+          <h2>Đơn vị tính</h2>
+          <table class="table" id="tblUoms">
+            <thead><tr><th>Mã</th><th>Tên</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </section>
+
+        <section class="panel">
+          <h2>Mã hàng (SKU)</h2>
+          <table class="table" id="tblSkus">
+            <thead><tr><th>SKU</th><th>Barcode</th><th>Sản phẩm</th><th>Mặc định</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </section>
+
+        <section class="panel">
+          <h2>Kho & Vị trí</h2>
+          <table class="table" id="tblWarehouses">
+            <thead><tr><th>Mã kho</th><th>Tên kho</th><th>Địa điểm</th><th>Diện tích</th><th>Lạnh</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <table class="table" id="tblLocations">
+            <thead><tr><th>Kho</th><th>Mã vị trí</th><th>Tên vị trí</th><th class="right">Sức chứa</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+
+    <div id="modal" class="modal hidden">
+      <div class="modal-content">
+        <h3 id="modalTitle">Thêm</h3>
+        <form id="modalForm"></form>
+        <div class="row right">
+          <button class="btn" id="btnClose">Đóng</button>
+          <button class="btn primary" id="btnSave">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script>
+      guardAuthenticated();
+      const current = getCurrentUser();
+      if (current.role !== 'Admin') document.getElementById('navUsers').style.display = 'none';
+      const $ = (s)=>document.querySelector(s);
+      
+      // Hàm tạo mã QR cho sản phẩm
+      function generateProductQR(productId) {
+        const products = storage.get('products', []);
+        const skus = storage.get('skus', []);
+        const warehouses = storage.get('warehouses', []);
+        const locations = storage.get('locations', []);
+        const transactions = storage.get('transactions', []);
+        
+        const product = products.find(p => p.id === productId);
+        if (!product) {
+          alert('Không tìm thấy sản phẩm!');
+          return;
+        }
+        
+        // Tính số lượng tồn kho
+        const onHand = transactions.reduce((total, tx) => {
+          const lines = tx.lines.filter(l => l.productId === productId);
+          return total + lines.reduce((sum, line) => {
+            return sum + (tx.type === 'IN' ? line.qty : -line.qty);
+          }, 0);
+        }, 0);
+        
+        // Tìm SKU mặc định
+        const defaultSku = skus.find(s => s.productId === productId && s.isDefault);
+        
+        // Tạo thông tin sản phẩm để mã hóa vào QR
+        const productInfo = {
+          id: product.id,
+          code: product.code,
+          name: product.name,
+          uom: product.uom || 'Cái',
+          barcode: defaultSku?.barcode || product.barcode || '',
+          sku: defaultSku?.skuCode || '',
+          manufacturer: product.manufacturer || 'Công ty TNHH ABC',
+          onHand: Math.max(0, onHand),
+          lastUpdated: new Date().toISOString(),
+          description: product.description || 'Sản phẩm chất lượng cao'
+        };
+        
+        // Tạo JSON string để mã hóa
+        const qrData = JSON.stringify(productInfo, null, 2);
+        
+        // Hiển thị modal với mã QR
+        showQRModal(product, productInfo, qrData);
+      }
+      
+      // Hiển thị modal mã QR
+      function showQRModal(product, productInfo, qrData) {
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalForm = document.getElementById('modalForm');
+        
+        modalTitle.textContent = `Mã QR - ${product.name}`;
+        
+        // Tạo HTML cho modal
+        modalForm.innerHTML = `
+          <div class="qr-container">
+            <div class="qr-info">
+              <h4>Thông tin sản phẩm</h4>
+              <div class="info-grid">
+                <div class="info-item">
+                  <strong>Mã sản phẩm:</strong> ${product.code}
+                </div>
+                <div class="info-item">
+                  <strong>Tên sản phẩm:</strong> ${product.name}
+                </div>
+                <div class="info-item">
+                  <strong>Công ty sản xuất:</strong> ${productInfo.manufacturer}
+                </div>
+                <div class="info-item">
+                  <strong>Đơn vị tính:</strong> ${productInfo.uom}
+                </div>
+                <div class="info-item">
+                  <strong>Số lượng tồn:</strong> ${productInfo.onHand.toLocaleString('vi-VN')} ${productInfo.uom}
+                </div>
+                <div class="info-item">
+                  <strong>SKU:</strong> ${productInfo.sku || 'N/A'}
+                </div>
+                <div class="info-item">
+                  <strong>Mã vạch:</strong> ${productInfo.barcode || 'N/A'}
+                </div>
+                <div class="info-item">
+                  <strong>Cập nhật:</strong> ${new Date(productInfo.lastUpdated).toLocaleString('vi-VN')}
+                </div>
+              </div>
+            </div>
+            <div class="qr-code">
+              <h4>Mã QR</h4>
+              <div id="qrcode"></div>
+              <p class="qr-note">Quét mã QR để xem thông tin chi tiết sản phẩm</p>
+            </div>
+          </div>
+          <div class="qr-actions">
+            <button type="button" class="btn secondary" onclick="downloadQR()">Tải xuống QR</button>
+            <button type="button" class="btn secondary" onclick="printQR()">In mã QR</button>
+          </div>
+        `;
+        
+        // Hiển thị modal
+        modal.classList.remove('hidden');
+        
+        // Tạo mã QR
+        setTimeout(() => {
+          const qrContainer = document.getElementById('qrcode');
+          if (qrContainer) {
+            QRCode.toCanvas(qrContainer, qrData, {
+              width: 200,
+              margin: 2,
+              color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+              }
+            }, function (error) {
+              if (error) {
+                console.error('Lỗi tạo mã QR:', error);
+                qrContainer.innerHTML = '<p class="error">Lỗi tạo mã QR</p>';
+              }
+            });
+          }
+        }, 100);
+        
+        // Cập nhật nút Save thành Close
+        const btnSave = document.getElementById('btnSave');
+        btnSave.textContent = 'Đóng';
+        btnSave.className = 'btn';
+        btnSave.onclick = () => modal.classList.add('hidden');
+        
+        // Cập nhật nút Close
+        document.getElementById('btnClose').onclick = () => modal.classList.add('hidden');
+      }
+      
+      // Tải xuống mã QR
+      function downloadQR() {
+        const canvas = document.querySelector('#qrcode canvas');
+        if (canvas) {
+          const link = document.createElement('a');
+          link.download = 'qr-code.png';
+          link.href = canvas.toDataURL();
+          link.click();
+        }
+      }
+      
+      // In mã QR
+      function printQR() {
+        const printWindow = window.open('', '_blank');
+        const qrContainer = document.querySelector('.qr-container').cloneNode(true);
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>In mã QR</title>
+              <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .qr-container { display: flex; gap: 20px; }
+                .qr-info { flex: 1; }
+                .qr-code { flex: 1; text-align: center; }
+                .info-grid { display: grid; gap: 10px; }
+                .info-item { padding: 5px 0; border-bottom: 1px solid #eee; }
+                canvas { max-width: 200px; height: auto; }
+                @media print { body { margin: 0; } }
+              </style>
+            </head>
+            <body>
+              ${qrContainer.outerHTML}
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
+      }
+      
+      function renderProducts(){
+        const term = ($('#filterProducts').value||'').toLowerCase();
+        const rows = storage.get('products', []).filter(p=>!term||p.code.toLowerCase().includes(term)||p.name.toLowerCase().includes(term)).map(p=>`
+          <tr><td>${p.code}</td><td>${p.name}</td><td>${p.uom||''}</td><td>${p.barcode||''}</td><td>${p.manufacturer||'Công ty TNHH ABC'}</td>
+            <td class=right>
+              <button class="btn tiny" onclick="generateProductQR('${p.id}')" title="Tạo mã QR">📱 QR</button>
+              <button class="btn tiny" onclick="editProduct('${p.id}')">Sửa</button> 
+              <button class="btn tiny danger" onclick="deleteProduct('${p.id}')">Xóa</button>
+            </td></tr>`).join('');
+        $('#tblProducts tbody').innerHTML = rows||'<tr><td colspan=6 class=muted>Không có dữ liệu</td></tr>';
+      }
+      function renderWarehouses(){
+        const rows = storage.get('warehouses', []).map(k=>`
+          <tr><td>${k.code}</td><td>${k.name}</td><td>${k.location}</td><td class=right>${k.areaTotal||0}</td><td>${k.isCold?'Có':'Không'}</td>
+            <td class=right><button class="btn tiny" onclick="editWarehouse('${k.id}')">Sửa</button> <button class="btn tiny danger" onclick="deleteWarehouse('${k.id}')">Xóa</button></td></tr>`).join('');
+        $('#tblWarehouses tbody').innerHTML = rows||'<tr><td colspan=6 class=muted>Không có dữ liệu</td></tr>';
+      }
+      function renderLocations(){
+        const whs = storage.get('warehouses', []);
+        const map = new Map(whs.map(w => [w.id, `${w.code} - ${w.name}`]));
+        const rows = (storage.get('locations', [])||[]).map(l => `
+          <tr><td>${map.get(l.warehouseId)||''}</td><td>${l.code}</td><td>${l.name}</td><td class=right>${l.capacity||0}</td>
+            <td class=right><button class="btn tiny" onclick="editLocation('${l.id}')">Sửa</button> <button class="btn tiny danger" onclick="deleteLocation('${l.id}')">Xóa</button></td></tr>`).join('');
+        $('#tblLocations tbody').innerHTML = rows || '<tr><td colspan=5 class=muted>Không có dữ liệu</td></tr>';
+      }
+      function renderUoms(){
+        const rows = (storage.get('uoms', [])||[]).map(u => `
+          <tr><td>${u.code}</td><td>${u.name}</td>
+            <td class=right><button class="btn tiny" onclick="editUom('${u.id}')">Sửa</button> <button class="btn tiny danger" onclick="deleteUom('${u.id}')">Xóa</button></td></tr>`).join('');
+        $('#tblUoms tbody').innerHTML = rows || '<tr><td colspan=3 class=muted>Không có dữ liệu</td></tr>';
+      }
+      function renderSkus(){
+        const prods = storage.get('products', []);
+        const map = new Map(prods.map(p => [p.id, `${p.code} - ${p.name}`]));
+        const rows = (storage.get('skus', [])||[]).map(s => `
+          <tr><td>${s.skuCode}</td><td>${s.barcode||''}</td><td>${map.get(s.productId)||''}</td><td>${s.isDefault?'Có':'Không'}</td>
+            <td class=right><button class="btn tiny" onclick="editSku('${s.id}')">Sửa</button> <button class="btn tiny danger" onclick="deleteSku('${s.id}')">Xóa</button></td></tr>`).join('');
+        $('#tblSkus tbody').innerHTML = rows || '<tr><td colspan=5 class=muted>Không có dữ liệu</td></tr>';
+      }
+      function openModal(title, html, onSave){ $('#modalTitle').textContent=title; $('#modalForm').innerHTML=html; document.getElementById('modal').classList.remove('hidden'); document.getElementById('btnSave').onclick=()=>{onSave(new FormData($('#modalForm'))); close();}; document.getElementById('btnClose').onclick=close; function close(){document.getElementById('modal').classList.add('hidden');}}
+      window.editProduct=(id)=>{ const list=storage.get('products',[]); const it=list.find(x=>x.id===id); openModal('Cập nhật sản phẩm',`
+        <label>Mã</label><input name=code value="${it.code}" required />
+        <label>Tên</label><input name=name value="${it.name}" required />
+        <label>ĐVT</label><input name=uom value="${it.uom||''}" />
+        <label>Mã vạch</label><input name=barcode value="${it.barcode||''}" />
+        <label>Công ty sản xuất</label><input name=manufacturer value="${it.manufacturer||'Công ty TNHH ABC'}" />
+        <label>Mô tả</label><textarea name=description rows=3>${it.description||''}</textarea>`,fd=>{it.code=fd.get('code');it.name=fd.get('name');it.uom=fd.get('uom');it.barcode=fd.get('barcode');it.manufacturer=fd.get('manufacturer');it.description=fd.get('description');storage.set('products',list);renderProducts();}); };
+      window.deleteProduct=(id)=>{ if(!confirm('Xóa sản phẩm này?'))return; const list=storage.get('products',[]).filter(x=>x.id!==id); storage.set('products',list); renderProducts(); };
+      document.getElementById('btnAddProduct').onclick=()=>openModal('Thêm sản phẩm',`
+        <label>Mã</label><input name=code required />
+        <label>Tên</label><input name=name required />
+        <label>ĐVT</label><input name=uom />
+        <label>Mã vạch</label><input name=barcode />
+        <label>Công ty sản xuất</label><input name=manufacturer value="Công ty TNHH ABC" />
+        <label>Mô tả</label><textarea name=description rows=3></textarea>`,fd=>{ const list=storage.get('products',[]); list.push({id:crypto.randomUUID(), code:fd.get('code'), name:fd.get('name'), uom:fd.get('uom'), barcode:fd.get('barcode'), manufacturer:fd.get('manufacturer'), description:fd.get('description')}); storage.set('products',list); renderProducts(); });
+      window.editWarehouse=(id)=>{ const list=storage.get('warehouses',[]); const k=list.find(x=>x.id===id); openModal('Cập nhật kho',`
+        <label>Mã kho</label><input name=code value="${k.code}" required />
+        <label>Tên kho</label><input name=name value="${k.name}" required />
+        <label>Địa điểm</label><input name=location value="${k.location}" required />
+        <label>Diện tích (m²)</label><input type=number step=0.01 name=areaTotal value="${k.areaTotal}" />
+        <label><input type=checkbox name=isCold ${k.isCold?'checked':''}/> Kho lạnh</label>`,fd=>{k.code=fd.get('code');k.name=fd.get('name');k.location=fd.get('location');k.areaTotal=Number(fd.get('areaTotal')||0);k.isCold=fd.get('isCold')==='on'; storage.set('warehouses',list); renderWarehouses();}); };
+      window.deleteWarehouse=(id)=>{ if(!confirm('Xóa kho này?'))return; const list=storage.get('warehouses',[]).filter(x=>x.id!==id); storage.set('warehouses',list); renderWarehouses(); };
+      document.getElementById('btnAddWarehouse').onclick=()=>openModal('Thêm kho',`
+        <label>Mã kho</label><input name=code required />
+        <label>Tên kho</label><input name=name required />
+        <label>Địa điểm</label><input name=location required />
+        <label>Diện tích (m²)</label><input type=number step=0.01 name=areaTotal />
+        <label><input type=checkbox name=isCold /> Kho lạnh</label>`,fd=>{ const list=storage.get('warehouses',[]); list.push({id:crypto.randomUUID(), code:fd.get('code'), name:fd.get('name'), location:fd.get('location'), areaTotal:Number(fd.get('areaTotal')||0), isCold:fd.get('isCold')==='on'}); storage.set('warehouses',list); renderWarehouses();});
+      // CRUD Vị trí
+      window.editLocation = (id) => {
+        const list = storage.get('locations', [])||[]; const l = list.find(x => x.id === id);
+        const whs = storage.get('warehouses', []);
+        openModal('Cập nhật vị trí', `
+          <label>Kho</label><select name=warehouseId>${whs.map(w=>`<option value="${w.id}" ${w.id===l.warehouseId?'selected':''}>${w.code} - ${w.name}</option>`).join('')}</select>
+          <label>Mã vị trí</label><input name=code value="${l.code}" required />
+          <label>Tên vị trí</label><input name=name value="${l.name}" />
+          <label>Sức chứa</label><input type=number step=1 name=capacity value="${l.capacity||0}" />
+        `, fd => {
+          l.warehouseId = fd.get('warehouseId'); l.code = fd.get('code'); l.name = fd.get('name'); l.capacity = Number(fd.get('capacity')||0);
+          storage.set('locations', list); renderLocations();
+        });
+      };
+      window.deleteLocation = (id) => { if (!confirm('Xóa vị trí này?')) return; const list=(storage.get('locations',[])||[]).filter(x=>x.id!==id); storage.set('locations', list); renderLocations(); };
+      document.getElementById('btnAddLocation').onclick = () => {
+        const whs = storage.get('warehouses', []);
+        openModal('Thêm vị trí', `
+          <label>Kho</label><select name=warehouseId>${whs.map(w=>`<option value="${w.id}">${w.code} - ${w.name}</option>`).join('')}</select>
+          <label>Mã vị trí</label><input name=code required />
+          <label>Tên vị trí</label><input name=name />
+          <label>Sức chứa</label><input type=number step=1 name=capacity />
+        `, fd => {
+          const list = storage.get('locations', [])||[];
+          list.push({ id: crypto.randomUUID(), warehouseId: fd.get('warehouseId'), code: fd.get('code'), name: fd.get('name'), capacity: Number(fd.get('capacity')||0) });
+          storage.set('locations', list); renderLocations();
+        });
+      };
+
+      // CRUD UOM
+      window.editUom = (id) => { const list = storage.get('uoms', []); const u = list.find(x=>x.id===id); openModal('Cập nhật ĐVT', `
+          <label>Mã</label><input name=code value="${u.code}" required />
+          <label>Tên</label><input name=name value="${u.name}" required />
+        `, fd => { u.code = fd.get('code'); u.name = fd.get('name'); storage.set('uoms', list); renderUoms(); }); };
+      window.deleteUom = (id) => { if (!confirm('Xóa ĐVT này?')) return; const list=storage.get('uoms',[]).filter(x=>x.id!==id); storage.set('uoms', list); renderUoms(); };
+      document.getElementById('btnAddUom').onclick = () => openModal('Thêm ĐVT', `
+          <label>Mã</label><input name=code required />
+          <label>Tên</label><input name=name required />
+        `, fd => { const list = storage.get('uoms', []); list.push({ id: crypto.randomUUID(), code: fd.get('code'), name: fd.get('name') }); storage.set('uoms', list); renderUoms(); });
+
+      // CRUD SKU
+      window.editSku = (id) => { const list = storage.get('skus', []); const s = list.find(x=>x.id===id); const prods = storage.get('products', []); openModal('Cập nhật mã hàng', `
+          <label>Sản phẩm</label><select name=productId>${prods.map(p=>`<option value="${p.id}" ${p.id===s.productId?'selected':''}>${p.code} - ${p.name}</option>`).join('')}</select>
+          <label>SKU</label><input name=skuCode value="${s.skuCode}" required />
+          <label>Barcode</label><input name=barcode value="${s.barcode||''}" />
+          <label><input type=checkbox name=isDefault ${s.isDefault?'checked':''}/> Mặc định</label>
+        `, fd => { s.productId = fd.get('productId'); s.skuCode = fd.get('skuCode'); s.barcode = fd.get('barcode'); s.isDefault = fd.get('isDefault')==='on'; storage.set('skus', list); renderSkus(); }); };
+      window.deleteSku = (id) => { if (!confirm('Xóa mã hàng này?')) return; const list=storage.get('skus',[]).filter(x=>x.id!==id); storage.set('skus', list); renderSkus(); };
+      document.getElementById('btnAddSku').onclick = () => { const prods = storage.get('products', []); openModal('Thêm mã hàng', `
+          <label>Sản phẩm</label><select name=productId>${prods.map(p=>`<option value=\"${p.id}\">${p.code} - ${p.name}</option>`).join('')}</select>
+          <label>SKU</label><input name=skuCode required />
+          <label>Barcode</label><input name=barcode />
+          <label><input type=checkbox name=isDefault /> Mặc định</label>
+        `, fd => { const list = storage.get('skus', []); list.push({ id: crypto.randomUUID(), productId: fd.get('productId'), skuCode: fd.get('skuCode'), barcode: fd.get('barcode'), isDefault: fd.get('isDefault')==='on' }); storage.set('skus', list); renderSkus(); }); };
+      document.getElementById('btnExport').onclick=()=>{ const rows=storage.get('products',[]); const csv=['code,name,uom,barcode'].concat(rows.map(r=>[r.code,r.name,r.uom||'',r.barcode||''].map(v=>'"'+String(v).replaceAll('"','""')+'"').join(','))).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='products.csv'; a.click(); };
+      document.getElementById('filterProducts').addEventListener('input',renderProducts);
+      renderProducts(); renderUoms(); renderSkus(); renderWarehouses(); renderLocations();
+    </script>
+  </body>
+  </html>
+
+

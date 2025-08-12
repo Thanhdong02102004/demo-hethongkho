@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quản lý Khách hàng</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <a href="home.html">Trang chủ</a>
+        <a href="catalog.html">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html">Báo cáo</a>
+        <a href="users.html" id="navUsers">Người dùng</a>
+        <a href="search.html">Tra cứu</a>
+        <a href="customers.html" class="active">Khách hàng</a>
+        <a href="invoices.html">Hóa đơn</a>
+      </aside>
+      <main class="content">
+        <header class="page-header">
+          <h1>Quản lý Khách hàng</h1>
+          <button id="btnAddCustomer" class="btn primary">+ Khách hàng mới</button>
+        </header>
+
+        <section class="panel">
+          <div class="row">
+            <input id="searchCustomer" placeholder="Tìm kiếm khách hàng..." style="flex: 1;" />
+            <label for="statusFilter" class="visually-hidden">Lọc theo trạng thái</label>
+            <select id="statusFilter" title="Lọc theo trạng thái">
+              <option value="">Tất cả trạng thái</option>
+              <option value="active">Hoạt động</option>
+              <option value="inactive">Không hoạt động</option>
+            </select>
+            <button id="btnSearch" class="btn primary">Tìm kiếm</button>
+          </div>
+          
+          <table class="table" id="tblCustomers">
+            <thead>
+              <tr>
+                <th>Mã KH</th>
+                <th>Tên khách hàng</th>
+                <th>Người liên hệ</th>
+                <th>Điện thoại</th>
+                <th>Email</th>
+                <th>Mã số thuế</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+
+    <!-- Modal thêm/sửa khách hàng -->
+    <div id="customerModal" class="modal hidden">
+      <div class="modal-content">
+        <h3 id="modalTitle">Thêm khách hàng mới</h3>
+        <form id="customerForm">
+          <div class="row">
+            <div class="col">
+              <label for="customerCode">Mã khách hàng:</label>
+              <input id="customerCode" type="text" required placeholder="Nhập mã khách hàng" title="Mã khách hàng" />
+            </div>
+            <div class="col">
+              <label for="customerName">Tên khách hàng:</label>
+              <input id="customerName" type="text" required placeholder="Nhập tên khách hàng" title="Tên khách hàng" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label>Người liên hệ:</label>
+              <input id="contactPerson" type="text" required />
+            </div>
+            <div class="col">
+              <label>Điện thoại:</label>
+              <input id="phone" type="tel" required />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label>Email:</label>
+              <input id="email" type="email" required />
+            </div>
+            <div class="col">
+              <label>Mã số thuế:</label>
+              <input id="taxCode" type="text" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col" style="flex: 1;">
+              <label>Địa chỉ:</label>
+              <input id="address" type="text" required />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label for="status">Trạng thái:</label>
+              <select id="status" required title="Trạng thái">
+                <option value="active">Hoạt động</option>
+                <option value="inactive">Không hoạt động</option>
+              </select>
+            </div>
+          </div>
+          <div class="row right">
+            <button type="button" id="btnCancel" class="btn secondary">Hủy</button>
+            <button type="submit" class="btn primary">Lưu</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+      guardAuthenticated();
+      const current = getCurrentUser();
+      if(current.role !== 'Admin') document.getElementById('navUsers').style.display = 'none';
+
+      // Load dữ liệu mẫu
+      seedDemoData(false);
+
+      let editingCustomerId = null;
+
+      // Render danh sách khách hàng
+      function renderCustomers(customers = null) {
+        if (!customers) {
+          customers = storage.get('customers', []);
+        }
+        
+        const tbody = document.querySelector('#tblCustomers tbody');
+        tbody.innerHTML = customers.map(customer => `
+          <tr>
+            <td><strong>${customer.code}</strong></td>
+            <td>${customer.name}</td>
+            <td>${customer.contactPerson}</td>
+            <td>${customer.phone}</td>
+            <td>${customer.email}</td>
+            <td>${customer.taxCode || 'N/A'}</td>
+            <td>
+              <span class="status-${customer.status === 'active' ? 'hoạt-động' : 'không-hoạt-động'}">
+                ${customer.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
+              </span>
+            </td>
+            <td>
+              <button onclick="editCustomer('${customer.id}')" class="btn tiny">Sửa</button>
+              <button onclick="deleteCustomer('${customer.id}')" class="btn tiny danger">Xóa</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // Thêm khách hàng mới
+      function addCustomer() {
+        editingCustomerId = null;
+        document.getElementById('modalTitle').textContent = 'Thêm khách hàng mới';
+        document.getElementById('customerForm').reset();
+        document.getElementById('customerModal').classList.remove('hidden');
+      }
+
+      // Sửa khách hàng
+      function editCustomer(id) {
+        const customers = storage.get('customers', []);
+        const customer = customers.find(c => c.id === id);
+        if (!customer) return;
+
+        editingCustomerId = id;
+        document.getElementById('modalTitle').textContent = 'Sửa thông tin khách hàng';
+        
+        document.getElementById('customerCode').value = customer.code;
+        document.getElementById('customerName').value = customer.name;
+        document.getElementById('contactPerson').value = customer.contactPerson;
+        document.getElementById('phone').value = customer.phone;
+        document.getElementById('email').value = customer.email;
+        document.getElementById('taxCode').value = customer.taxCode || '';
+        document.getElementById('address').value = customer.address;
+        document.getElementById('status').value = customer.status;
+        
+        document.getElementById('customerModal').classList.remove('hidden');
+      }
+
+      // Xóa khách hàng
+      function deleteCustomer(id) {
+        if (!confirm('Bạn có chắc muốn xóa khách hàng này?')) return;
+        
+        const customers = storage.get('customers', []);
+        const updatedCustomers = customers.filter(c => c.id !== id);
+        storage.set('customers', updatedCustomers);
+        renderCustomers();
+      }
+
+      // Tìm kiếm khách hàng
+      function searchCustomers() {
+        const term = document.getElementById('searchCustomer').value.toLowerCase();
+        const statusFilter = document.getElementById('statusFilter').value;
+        
+        let customers = storage.get('customers', []);
+        
+        if (term) {
+          customers = customers.filter(c => 
+            c.code.toLowerCase().includes(term) ||
+            c.name.toLowerCase().includes(term) ||
+            c.contactPerson.toLowerCase().includes(term) ||
+            c.phone.includes(term) ||
+            c.email.toLowerCase().includes(term)
+          );
+        }
+        
+        if (statusFilter) {
+          customers = customers.filter(c => c.status === statusFilter);
+        }
+        
+        renderCustomers(customers);
+      }
+
+      // Lưu khách hàng
+      function saveCustomer(formData) {
+        const customers = storage.get('customers', []);
+        
+        if (editingCustomerId) {
+          // Cập nhật khách hàng hiện có
+          const index = customers.findIndex(c => c.id === editingCustomerId);
+          if (index !== -1) {
+            customers[index] = {
+              ...customers[index],
+              ...formData
+            };
+          }
+        } else {
+          // Thêm khách hàng mới
+          const newCustomer = {
+            id: crypto.randomUUID(),
+            ...formData
+          };
+          customers.push(newCustomer);
+        }
+        
+        storage.set('customers', customers);
+        renderCustomers();
+        document.getElementById('customerModal').classList.add('hidden');
+      }
+
+      // Event listeners
+      document.getElementById('btnAddCustomer').onclick = addCustomer;
+      document.getElementById('btnSearch').onclick = searchCustomers;
+      document.getElementById('btnCancel').onclick = () => {
+        document.getElementById('customerModal').classList.add('hidden');
+      };
+
+      document.getElementById('customerForm').onsubmit = (e) => {
+        e.preventDefault();
+        
+        const formData = {
+          code: document.getElementById('customerCode').value,
+          name: document.getElementById('customerName').value,
+          contactPerson: document.getElementById('contactPerson').value,
+          phone: document.getElementById('phone').value,
+          email: document.getElementById('email').value,
+          taxCode: document.getElementById('taxCode').value,
+          address: document.getElementById('address').value,
+          status: document.getElementById('status').value
+        };
+        
+        saveCustomer(formData);
+      };
+
+      // Tìm kiếm khi nhập
+      document.getElementById('searchCustomer').oninput = searchCustomers;
+      document.getElementById('statusFilter').onchange = searchCustomers;
+
+      // Khởi tạo
+      renderCustomers();
+    </script>
+  </body>
+</html>

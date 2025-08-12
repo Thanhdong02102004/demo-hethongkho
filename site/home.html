@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trang chủ - Quản lý kho</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">QL Kho</div>
+      <nav class="top-nav">
+        <a href="home.html" class="active">Trang chủ</a>
+        <a href="catalog.html">Danh mục</a>
+        <a href="operations.html">Nghiệp vụ kho</a>
+        <a href="reports.html">Báo cáo</a>
+        <a href="users.html" id="usersLink">Người dùng</a>
+        <a href="search.html">Tra cứu</a>
+        <a href="customers.html">Khách hàng</a>
+        <a href="invoices.html">Hóa đơn</a>
+      </nav>
+      <div class="user-box">
+        <span id="welcomeUser"></span>
+        <button id="btnLogout" class="btn">Đăng xuất</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero">
+        <h1>Trang chủ</h1>
+        <p>Hệ thống quản lý kho — thao tác nhanh, rõ ràng, bảo mật.</p>
+      </section>
+
+      <!-- Xóa khu thao tác nhanh theo yêu cầu -->
+
+      <section class="kpi-grid">
+        <div class="kpi-card kpi-a">
+          <div class="kpi-title">Sản phẩm trong kho</div>
+          <div class="kpi-value" id="kpiProducts">0</div>
+        </div>
+        <div class="kpi-card kpi-b">
+          <div class="kpi-title">Hàng sắp hết (<= 5)</div>
+          <div class="kpi-value" id="kpiLowStock">0</div>
+        </div>
+        <div class="kpi-card kpi-c">
+          <div class="kpi-title">Phiếu nhập hôm nay</div>
+          <div class="kpi-value" id="kpiInToday">0</div>
+        </div>
+        <div class="kpi-card kpi-d">
+          <div class="kpi-title">Phiếu xuất hôm nay</div>
+          <div class="kpi-value" id="kpiOutToday">0</div>
+        </div>
+        <div class="kpi-card kpi-e">
+          <div class="kpi-title">Khoảng trống còn lại (m²)</div>
+          <div class="kpi-value" id="kpiAreaFree">0</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Phân tích nhanh</h2>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
+          <div class="card"><h3>Khu vực còn trống theo kho</h3><canvas id="chartFreeArea" height="150"></canvas></div>
+          <div class="card"><h3>Phiếu nhập/xuất 7 ngày</h3><canvas id="chartInOut" height="150"></canvas></div>
+          <div class="card"><h3>Top 5 sản phẩm tồn</h3><canvas id="chartTopOnHand" height="150"></canvas></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Bảng điều khiển chi tiết</h2>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">
+          <div class="card"><h3>Top 5 nhập theo sản phẩm (30 ngày)</h3><canvas id="chartTopIn" height="160"></canvas></div>
+          <div class="card"><h3>Top 5 xuất theo sản phẩm (30 ngày)</h3><canvas id="chartTopOut" height="160"></canvas></div>
+          <div class="card"><h3>Xu hướng doanh thu 30 ngày</h3><canvas id="chartTrend" height="160"></canvas></div>
+          <div class="card"><h3>Tỷ lệ sử dụng diện tích</h3><canvas id="chartUtil" height="160"></canvas></div>
+          <div class="card"><h3>Tỷ lệ sản phẩm sắp hết</h3><canvas id="chartLow" height="160"></canvas></div>
+          <div class="card"><h3>Doanh thu theo kho (cột)</h3><canvas id="chartRevenueByWh" height="160"></canvas></div>
+          <div class="card"><h3>Tỷ trọng doanh thu theo nhóm SP (tròn)</h3><canvas id="chartRevenueShare" height="160"></canvas></div>
+        </div>
+      </section>
+
+      <!-- Thêm section mới cho phân tích lợi nhuận & doanh thu -->
+      <section class="panel">
+        <h2>Phân tích lợi nhuận & Doanh thu</h2>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(350px,1fr))">
+          <!-- Top row với 3 biểu đồ chính -->
+          <div class="card">
+            <h3>DOANH THU THEO NHÓM SP</h3>
+            <canvas id="chartRevenueByGroup" height="200"></canvas>
+          </div>
+          <div class="card">
+            <h3>LỢI NHUẬN HĐKD THEO NHÓM SP</h3>
+            <canvas id="chartProfitByGroup" height="200"></canvas>
+          </div>
+          <div class="card">
+            <div class="kpi-large">
+              <div class="kpi-title">TĂNG TRƯỞNG DOANH THU</div>
+              <div class="kpi-value" id="kpiRevenueGrowth">-3%</div>
+            </div>
+            <div class="kpi-large">
+              <div class="kpi-title">ROS TOÀN CÔNG TY</div>
+              <canvas id="chartCompanyROS" height="120"></canvas>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Bottom row với 3 biểu đồ chi tiết -->
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(350px,1fr)); margin-top: 20px;">
+          <div class="card">
+            <h3>DOANH THU THEO THÁNG</h3>
+            <canvas id="chartRevenueByMonth" height="180"></canvas>
+          </div>
+          <div class="card">
+            <h3>TĂNG TRƯỞNG DOANH THU TỪNG NHÓM HÀNG</h3>
+            <canvas id="chartGrowthByGroup" height="180"></canvas>
+          </div>
+          <div class="card">
+            <h3>ROS CỦA NHÓM HÀNG</h3>
+            <canvas id="chartGroupROS" height="180"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Công cụ</h2>
+        <div class="row">
+          <button id="btnSeed" class="btn secondary">Thiết lập lại dữ liệu</button>
+          <button id="btnPerfTest" class="btn">Kiểm tra hiệu suất</button>
+          <a href="debug.html" class="btn" target="_blank">Debug</a>
+        </div>
+        <div id="perfOutput" class="mono"></div>
+      </section>
+    </main>
+
+    <script src="assets/js/storage.js"></script>
+    <script src="assets/js/data.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" onerror="loadChartJsFallback()"></script>
+    <script>
+      function loadChartJsFallback() {
+        console.log('Trying fallback Chart.js CDN...');
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+        script.onerror = function() {
+          console.error('Chart.js failed to load from both CDNs');
+          alert('Không thể tải Chart.js. Vui lòng kiểm tra kết nối internet và refresh trang.');
+        };
+        document.head.appendChild(script);
+      }
+      
+      guardAuthenticated();
+      const current = getCurrentUser();
+      document.getElementById('welcomeUser').textContent = `${current.fullName} (${current.role})`;
+      if (current.role !== 'Admin') { document.getElementById('usersLink').style.display='none'; }
+      document.getElementById('btnLogout').onclick = () => logout();
+
+      // Chỉ seed dữ liệu nếu chưa có dữ liệu
+      function ensureSeedData() {
+        const products = storage.get('products', []);
+        const transactions = storage.get('transactions', []);
+        const warehouses = storage.get('warehouses', []);
+        if (products.length === 0 || transactions.length === 0 || warehouses.length === 0) {
+          console.log('Không có dữ liệu, tiến hành seed dữ liệu mẫu...');
+          storage.clearAll();
+          seedDemoData(true);
+          console.log('Đã seed dữ liệu mẫu!');
+        } else {
+          console.log('Dữ liệu đã có sẵn, không cần seed lại.');
+        }
+      }
+      ensureSeedData();
+
+      // Đợi Chart.js load xong và dữ liệu sẵn sàng
+      function waitForChartJsAndRender() {
+        let tries = 0;
+        function tryRender() {
+          tries++;
+          if (typeof Chart === 'undefined') {
+            if (tries < 10) {
+              setTimeout(tryRender, 300);
+            } else {
+              alert('Không thể tải Chart.js. Vui lòng kiểm tra kết nối mạng và refresh trang.');
+            }
+            return;
+          }
+          renderAllCharts();
+        }
+        tryRender();
+      }
+      window.addEventListener('load', waitForChartJsAndRender);
+
+      function renderAllCharts() {
+        try {
+          console.log('Bắt đầu hàm renderAllCharts...');
+
+          // Kiểm tra các canvas elements có tồn tại không
+          const canvasIds = ['chartFreeArea', 'chartInOut', 'chartTopOnHand', 'chartTopIn', 'chartTopOut', 'chartTrend', 'chartUtil', 'chartLow', 'chartRevenueByWh', 'chartRevenueShare', 'chartRevenueByGroup', 'chartProfitByGroup', 'chartCompanyROS', 'chartRevenueByMonth', 'chartGrowthByGroup', 'chartGroupROS'];
+          const missingCanvases = canvasIds.filter(id => !document.getElementById(id));
+          if (missingCanvases.length > 0) {
+            console.error('Không tìm thấy các canvas elements:', missingCanvases);
+            alert('Lỗi: Không tìm thấy các canvas elements. Vui lòng refresh trang.');
+            return;
+          }
+          console.log('Tất cả canvas elements đã được tìm thấy');
+
+          // ====== Charts ======
+          const warehouses = storage.get('warehouses', []);
+          const txs = storage.get('transactions', []);
+          const products = storage.get('products', []);
+          
+          console.log('Debug data:', {
+            warehouses: warehouses.length,
+            transactions: txs.length, 
+            products: products.length
+          });
+          
+          // Kiểm tra nếu không có dữ liệu
+          if (products.length === 0) {
+            console.error('Không có dữ liệu sản phẩm!');
+            alert('Không có dữ liệu! Nhấn "Thiết lập lại dữ liệu" để tạo dữ liệu mẫu.');
+            return;
+          }
+
+          // KPIs
+          const today = new Date();
+          const isToday = d => sameDay(today, new Date(d));
+          document.getElementById('kpiProducts').textContent = products.length.toLocaleString('vi-VN');
+          // Low stock demo: tính on-hand và đếm số <=5
+          const onhandAll = (pid) => txs.reduce((s,t)=> s + t.lines.filter(l=>l.productId===pid).reduce((x,l)=> x + (t.type==='IN'?l.qty:-l.qty),0), 0);
+          const low = products.filter(p => onhandAll(p.id) <= 5).length; document.getElementById('kpiLowStock').textContent = low.toLocaleString('vi-VN');
+          document.getElementById('kpiInToday').textContent = txs.filter(t=>t.type==='IN' && isToday(t.createdAt)).length.toLocaleString('vi-VN');
+          document.getElementById('kpiOutToday').textContent = txs.filter(t=>t.type==='OUT' && isToday(t.createdAt)).length.toLocaleString('vi-VN');
+          const areaFreeTotal = warehouses.reduce((s,w)=> s + Number(w.areaFree ?? 0), 0); document.getElementById('kpiAreaFree').textContent = areaFreeTotal.toLocaleString('vi-VN');
+
+          console.log('KPIs đã được cập nhật');
+
+          // 1) Free area per warehouse (bar)
+          const freeLabels = warehouses.map(w => w.code);
+          const freeData = warehouses.map(w => Number(w.areaFree ?? Math.max(0,(w.areaTotal||0) - 0)));
+          console.log('Tạo biểu đồ free area:', { labels: freeLabels, data: freeData });
+          new Chart(document.getElementById('chartFreeArea'), { type: 'bar', data: { labels: freeLabels, datasets: [{ label: 'm² còn trống', data: freeData, backgroundColor: '#22c55e' }] }, options: { plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} } });
+
+          // 2) In/Out last 7 days (line)
+          const days = [...Array(7)].map((_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(6-i)); return d; });
+          const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
+          const inCounts = days.map(d => txs.filter(t => t.type==='IN' && sameDay(d,new Date(t.createdAt))).length);
+          const outCounts = days.map(d => txs.filter(t => t.type==='OUT' && sameDay(d,new Date(t.createdAt))).length);
+          console.log('Tạo biểu đồ in/out:', { labels: days.map(fmt), inCounts, outCounts });
+          new Chart(document.getElementById('chartInOut'), { type:'line', data:{ labels: days.map(fmt), datasets:[{ label:'Nhập', data:inCounts, borderColor:'#22c55e', tension:.3 }, { label:'Xuất', data:outCounts, borderColor:'#ef4444', tension:.3 }] }, options:{ plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true, precision:0}} } });
+
+          function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+          // 3) Top 5 on-hand per product (pie)
+          const withQty = products.map(p => ({ name: `${p.code}`, qty: onhandAll(p.id) })).sort((a,b)=>b.qty-a.qty).slice(0,5);
+          console.log('Tạo biểu đồ top on-hand:', withQty);
+          new Chart(document.getElementById('chartTopOnHand'), { type:'pie', data:{ labels: withQty.map(x=>x.name), datasets:[{ data: withQty.map(x=>x.qty), backgroundColor:['#2563eb','#22c55e','#f59e0b','#ef4444','#8b5cf6'] }] }, options:{ plugins:{legend:{position:'bottom'}} } });
+
+          // ===== Additional dashboards =====
+          const days30=[...Array(30)].map((_,i)=>{const d=new Date(); d.setDate(d.getDate()-(29-i)); return d;});
+          const isWithin30=d=>{const dd=new Date(d); const start=new Date(); start.setDate(start.getDate()-29); return dd>=start;};
+          // Top 5 nhập/xuất theo sản phẩm trong 30 ngày
+          const agg=(type)=>{const m=new Map(); txs.filter(t=>t.type===type && isWithin30(t.createdAt)).forEach(t=>t.lines.forEach(l=>m.set(l.productId,(m.get(l.productId)||0)+l.qty))); return Array.from(m.entries()).map(([pid,qty])=>({pid,qty})).sort((a,b)=>b.qty-a.qty).slice(0,5)};
+          const topIn=agg('IN'); const topOut=agg('OUT');
+          const nameById=id=>{const p=products.find(x=>x.id===id); return p?p.code:'?';};
+          new Chart(document.getElementById('chartTopIn'), {type:'bar',data:{labels:topIn.map(x=>nameById(x.pid)),datasets:[{label:'SL nhập',data:topIn.map(x=>x.qty),backgroundColor:'#0ea5e9'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+          new Chart(document.getElementById('chartTopOut'), {type:'bar',data:{labels:topOut.map(x=>nameById(x.pid)),datasets:[{label:'SL xuất',data:topOut.map(x=>x.qty),backgroundColor:'#f59e0b'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+
+          // Xu hướng tổng giao dịch 30 ngày (line)
+          const price = id => (products.find(p=>p.id===id)?.price)||0;
+          const label30=days30.map(d=>`${d.getMonth()+1}/${d.getDate()}`);
+          const revenuePerDay=days30.map(d=>txs.filter(t=>sameDay(d,new Date(t.createdAt))).reduce((s,t)=>s+t.lines.reduce((x,l)=>x + (t.type==='IN'?price(l.productId)*l.qty:-price(l.productId)*l.qty),0),0));
+          new Chart(document.getElementById('chartTrend'),{type:'line',data:{labels:label30,datasets:[{label:'Doanh thu (giả lập)',data:revenuePerDay,borderColor:'#2563eb',tension:.3}]},options:{plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}});
+
+          // Tỷ lệ sử dụng diện tích (doughnut)
+          const used=warehouses.map(w=>Math.max(0,(w.areaTotal||0)-(w.areaFree||0))).reduce((a,b)=>a+b,0);
+          const free=warehouses.reduce((s,w)=>s+(w.areaFree||0),0);
+          new Chart(document.getElementById('chartUtil'),{type:'doughnut',data:{labels:['Đang sử dụng','Còn trống'],datasets:[{data:[used,free],backgroundColor:['#ef4444','#22c55e']}]},options:{plugins:{legend:{position:'bottom'}}}});
+
+          // Tỷ lệ sản phẩm sắp hết (<=5)
+          const lowCount=products.filter(p=>onhandAll(p.id)<=5).length; const okCount=products.length-lowCount;
+          new Chart(document.getElementById('chartLow'),{type:'doughnut',data:{labels:['Sắp hết','Đủ tồn'],datasets:[{data:[lowCount,okCount],backgroundColor:['#f97316','#2563eb']}]},options:{plugins:{legend:{position:'bottom'}}}});
+
+          // Doanh thu theo kho (cột) và Tỷ trọng doanh thu theo nhóm SP (tròn)
+          // Revenue by warehouse: cộng theo phiếu xuất (OUT) — giả lập doanh thu khi xuất
+          const sumByWh = new Map();
+          txs.filter(t=>t.type==='OUT').forEach(t=>{
+            const val = t.lines.reduce((s,l)=> s + price(l.productId)*l.qty, 0);
+            sumByWh.set(t.warehouseId, (sumByWh.get(t.warehouseId)||0) + val);
+          });
+          const revWhLabels = warehouses.map(w=>w.code);
+          const revWhData = warehouses.map(w=>Math.round(sumByWh.get(w.id)||0));
+          new Chart(document.getElementById('chartRevenueByWh'), {type:'bar', data:{labels:revWhLabels, datasets:[{label:'Doanh thu xuất (đ)', data:revWhData, backgroundColor:'#10b981'}]}, options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}});
+
+          // Revenue share by product group (giả lập nhóm = ký tự đầu của mã SP)
+          const groupRev = new Map();
+          txs.filter(t=>t.type==='OUT').forEach(t=>t.lines.forEach(l=>{
+            const p = products.find(x=>x.id===l.productId); const group = (p?.code||'X').slice(0,2);
+            groupRev.set(group, (groupRev.get(group)||0) + price(l.productId)*l.qty);
+          }));
+          const shareLabels = Array.from(groupRev.keys());
+          const shareData = Array.from(groupRev.values());
+          new Chart(document.getElementById('chartRevenueShare'), {type:'doughnut', data:{labels:shareLabels, datasets:[{data:shareData, backgroundColor:['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#84cc16']}]}, options:{plugins:{legend:{position:'bottom'}}}});
+
+          // ===== THÊM CÁC BIỂU ĐỒ PHÂN TÍCH LỢI NHUẬN MỚI =====
+          
+          // 1. DOANH THU THEO NHÓM SP (Bar chart)
+          const productGroups = ['Nhóm chuối', 'Nhóm khoai', 'Nhóm mít', 'Nhóm thơm', 'Nhóm xoài'];
+          const revenueData = [222, 264, 418, 363, 398]; // Triệu VND
+          new Chart(document.getElementById('chartRevenueByGroup'), {
+            type: 'bar',
+            data: {
+              labels: productGroups,
+              datasets: [{
+                label: 'Doanh thu (Triệu VND)',
+                data: revenueData,
+                backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6']
+              }]
+            },
+            options: {
+              plugins: { legend: { display: false } },
+              scales: { y: { beginAtZero: true, title: { display: true, text: 'Triệu VND' } } }
+            }
+          });
+
+          // 2. LỢI NHUẬN HĐKD THEO NHÓM SP (Bar chart)
+          const profitData = [52, 61, 85, 88, 91]; // Triệu VND
+          new Chart(document.getElementById('chartProfitByGroup'), {
+            type: 'bar',
+            data: {
+              labels: productGroups,
+              datasets: [{
+                label: 'Lợi nhuận (Triệu VND)',
+                data: profitData,
+                backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6']
+              }]
+            },
+            options: {
+              plugins: { legend: { display: false } },
+              scales: { y: { beginAtZero: true, title: { display: true, text: 'Triệu VND' } } }
+            }
+          });
+
+          // 3. ROS TOÀN CÔNG TY (Donut chart)
+          new Chart(document.getElementById('chartCompanyROS'), {
+            type: 'doughnut',
+            data: {
+              labels: ['ROS', 'Còn lại'],
+              datasets: [{
+                data: [22, 78],
+                backgroundColor: ['#22c55e', '#e5e7eb']
+              }]
+            },
+            options: {
+              plugins: {
+                legend: { position: 'bottom' },
+                tooltip: { callbacks: { label: function(context) { return context.label + ': ' + context.parsed + '%'; } } }
+              },
+              cutout: '60%'
+            }
+          });
+
+          // 4. DOANH THU THEO THÁNG (Bar chart)
+          const months = ['T04-2019', 'T05-2019', 'T06-2019', 'T07-2019', 'T08-2019', 'T09-2019', 'T10-2019'];
+          const monthlyRevenue = [393, 434, 311, 306, 399, 479, 222]; // Triệu VND
+          new Chart(document.getElementById('chartRevenueByMonth'), {
+            type: 'bar',
+            data: {
+              labels: months,
+              datasets: [{
+                label: 'Doanh thu (Triệu VND)',
+                data: monthlyRevenue,
+                backgroundColor: '#f59e0b'
+              }]
+            },
+            options: {
+              plugins: { legend: { display: false } },
+              scales: { y: { beginAtZero: true, title: { display: true, text: 'Triệu VND' } } }
+            }
+          });
+
+          // 5. TĂNG TRƯỞNG DOANH THU TỪNG NHÓM HÀNG (Line chart)
+          const growthMonths = ['T11-2018', 'T12-2018', 'T01-2019', 'T02-2019', 'T03-2019', 'T04-2019', 'T05-2019', 'T06-2019', 'T07-2019', 'T08-2019', 'T09-2019', 'T10-2019'];
+          const growthData = [100, 86, 80, 120, 122, 110, 122, 87, 94, 112, 134, 62]; // %
+          new Chart(document.getElementById('chartGrowthByGroup'), {
+            type: 'line',
+            data: {
+              labels: growthMonths,
+              datasets: [{
+                label: 'Tăng trưởng (%)',
+                data: growthData,
+                borderColor: '#f59e0b',
+                backgroundColor: '#3b82f6',
+                tension: 0.3,
+                pointBackgroundColor: '#3b82f6',
+                pointBorderColor: '#f59e0b'
+              }]
+            },
+            options: {
+              plugins: { legend: { position: 'bottom' } },
+              scales: { 
+                y: { 
+                  beginAtZero: true, 
+                  title: { display: true, text: 'Tăng trưởng (%)' },
+                  ticks: { callback: function(value) { return value + '%'; } }
+                } 
+              }
+            }
+          });
+
+          // 6. ROS CỦA NHÓM HÀNG (Donut chart)
+          new Chart(document.getElementById('chartGroupROS'), {
+            type: 'doughnut',
+            data: {
+              labels: ['ROS', 'Còn lại'],
+              datasets: [{
+                data: [22, 78],
+                backgroundColor: ['#1e40af', '#e5e7eb']
+              }]
+            },
+            options: {
+              plugins: {
+                legend: { position: 'bottom' },
+                tooltip: { callbacks: { label: function(context) { return context.label + ': ' + context.parsed + '%'; } } }
+              },
+              cutout: '60%'
+            }
+          });
+
+          // Cập nhật KPI tăng trưởng doanh thu
+          document.getElementById('kpiRevenueGrowth').textContent = '-3%';
+
+          console.log('Tất cả biểu đồ đã được tạo thành công!');
+
+        } catch (error) {
+          console.error('Lỗi khi tạo biểu đồ:', error);
+          console.error('Stack trace:', error.stack);
+          // Hiển thị thông báo lỗi trên UI
+          document.querySelectorAll('canvas').forEach(canvas => {
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ef4444';
+            ctx.font = '14px Arial';
+            ctx.fillText('Lỗi tải biểu đồ', 10, 30);
+          });
+        }
+      }
+      
+      // Sửa lại nút thiết lập lại dữ liệu
+      setTimeout(() => {
+        const btnSeed = document.getElementById('btnSeed');
+        if (btnSeed) {
+          btnSeed.addEventListener('click', function() {
+            if (!confirm('Bạn có chắc chắn muốn thiết lập lại dữ liệu mẫu?')) return;
+            storage.clearAll();
+            seedDemoData(true);
+            alert('Đã reset và load dữ liệu mẫu mới!');
+            window.location.reload();
+          });
+          btnSeed.style.cursor = 'pointer';
+          btnSeed.style.backgroundColor = '#22c55e';
+          btnSeed.style.color = 'white';
+        }
+      }, 200);
+    </script>
+  </body>
+  </html>
+
+

@@ -1,0 +1,3 @@
+function getCurrentUser(){return storage.get('currentUser',null);}function login(username,password){const users=storage.get('users',[]);const u=users.find(x=>x.username===username&&x.password===password&&x.active);if(!u)return false;storage.set('currentUser',{id:u.id,username:u.username,role:u.role,fullName:u.fullName});return true;}function logout(){storage.remove('currentUser');window.location.href='index.html';}function guardAuthenticated(role){const u=getCurrentUser();if(!u){window.location.href='index.html';return;}if(role&&u.role!==role){alert('Bạn không có quyền truy cập trang này');window.location.href='home.html';}}
+
+
